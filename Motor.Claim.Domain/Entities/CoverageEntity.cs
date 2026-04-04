@@ -1,0 +1,36 @@
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Motor.Claim.Domain.Entities
+{
+    public class CoverageEntity
+    {
+        public DateTime CreatedAt { get; set; }
+
+        [Key]
+        public Guid CoverageId { get; set; }
+
+        [Required]
+        public Guid UserId { get; set; }
+
+        [Required]
+        public string InsuredPersonName { get; set; }
+
+        [Required]
+        public string VehicleNo { get; set; }
+
+        [Required]
+        public string CoverageType { get; set; }
+
+        [Required]
+        public DateTime EffectiveDate { get; set; }
+
+        [Required]
+        public DateTime ExpiryDate { get; set; }
+
+        [ForeignKey("UserId")]
+        public UserEntity User { get; set; }
+
+        public ICollection<ClaimEntity> Claims { get; set; } = new List<ClaimEntity>();
+    }
+}

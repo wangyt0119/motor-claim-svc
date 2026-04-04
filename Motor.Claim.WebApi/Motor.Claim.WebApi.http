@@ -1,0 +1,6 @@
+@Motor.Claim.WebApi_HostAddress = http://localhost:5247
+
+GET {{Motor.Claim.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

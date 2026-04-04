@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.25" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.14">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Motor.Claim.Application\Motor.Claim.Application.csproj" />
+    <ProjectReference Include="..\Motor.Claim.Domain\Motor.Claim.Domain.csproj" />
+    <ProjectReference Include="..\Motor.Claim.Infrastructure.Persistence\Motor.Claim.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\Motor.Claim.Infrastructure.Shared\Motor.Claim.Infrastructure.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

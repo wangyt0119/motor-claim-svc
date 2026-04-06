@@ -9,7 +9,7 @@ namespace Motor.Claim.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Policy = "CustomerOnly")]
     public class CoverageController : ControllerBase
     {
         private readonly CreateCoverageCommandHandler _createCoverageCommandHandler;

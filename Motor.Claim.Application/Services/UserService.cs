@@ -26,6 +26,11 @@ namespace Motor.Claim.Application.Services
 
         public async Task<UserEntity> RegisterAsync(RegisterUserRequest request)
         {
+            return await RegisterAsync(request, UserRole.Customer);
+        }
+
+        public async Task<UserEntity> RegisterAsync(RegisterUserRequest request, UserRole role)
+        {
             var existingUser = await _userRepository.GetByEmailAsync(request.Email);
             if (existingUser != null)
             {
@@ -70,7 +75,8 @@ namespace Motor.Claim.Application.Services
                 MobileCountry = request.MobileCountry,
                 MobileNumber = request.MobileNumber,
                 Email = request.Email,
-                IsMaybankGroupEmployee = request.IsMaybankGroupEmployee
+                IsMaybankGroupEmployee = request.IsMaybankGroupEmployee,
+                Role = role
             };
 
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
@@ -100,7 +106,8 @@ namespace Motor.Claim.Application.Services
                 Token = token,
                 UserId = user.UserId,
                 FullName = user.FullName,
-                Email = user.Email
+                Email = user.Email,
+                Role = user.Role
             };
         }
 
@@ -121,6 +128,8 @@ namespace Motor.Claim.Application.Services
                 new System.Security.Claims.Claim("UserId", user.UserId.ToString()),
                 new System.Security.Claims.Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new System.Security.Claims.Claim(JwtRegisteredClaimNames.UniqueName, user.FullName),
+                new System.Security.Claims.Claim(ClaimTypes.Role, user.Role.ToString()),
+                new System.Security.Claims.Claim("role", user.Role.ToString()),
                 new System.Security.Claims.Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 

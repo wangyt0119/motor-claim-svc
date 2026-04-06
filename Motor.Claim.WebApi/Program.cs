@@ -26,12 +26,12 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<CoverageService>();
 builder.Services.AddScoped<ClaimService>();
 
-
 builder.Services.AddScoped<CreateCoverageCommandHandler>();
 builder.Services.AddScoped<GetMyCoveragesQueryHandler>();
 
 builder.Services.AddScoped<CreateClaimCommandHandler>();
 builder.Services.AddScoped<GetMyClaimsQueryHandler>();
+builder.Services.AddScoped<GetAllClaimsQueryHandler>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
@@ -49,16 +49,35 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(key),
-
         ClockSkew = TimeSpan.Zero
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CustomerOnly", policy =>
+        policy.RequireRole("Customer"));
+
+    options.AddPolicy("OfficerOrAdmin", policy =>
+        policy.RequireRole("Officer", "Admin"));
+
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole("Admin"));
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -74,7 +93,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();   
+app.UseCors("AllowReactApp");
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

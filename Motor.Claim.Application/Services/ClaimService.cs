@@ -68,6 +68,11 @@ namespace Motor.Claim.Application.Services
             return await _claimRepository.GetByUserIdAsync(userId);
         }
 
+        public async Task<List<ClaimEntity>> GetAllAsync()
+        {
+            return await _claimRepository.GetAllAsync();
+        }
+
         private static void ValidateDocuments(CreateClaimCommand command)
         {
             var missingDocuments = new List<string>();

@@ -8,21 +8,24 @@ namespace Motor.Claim.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
     public class ClaimController : ControllerBase
     {
         private readonly CreateClaimCommandHandler _createClaimCommandHandler;
         private readonly GetMyClaimsQueryHandler _getMyClaimsQueryHandler;
+        private readonly GetAllClaimsQueryHandler _getAllClaimsQueryHandler;
 
         public ClaimController(
             CreateClaimCommandHandler createClaimCommandHandler,
-            GetMyClaimsQueryHandler getMyClaimsQueryHandler)
+            GetMyClaimsQueryHandler getMyClaimsQueryHandler,
+            GetAllClaimsQueryHandler getAllClaimsQueryHandler)
         {
             _createClaimCommandHandler = createClaimCommandHandler;
             _getMyClaimsQueryHandler = getMyClaimsQueryHandler;
+            _getAllClaimsQueryHandler = getAllClaimsQueryHandler;
         }
 
         [HttpPost]
+        [Authorize(Policy = "CustomerOnly")]
         public async Task<IActionResult> Create([FromBody] CreateClaimRequest request)
         {
             try
@@ -60,6 +63,7 @@ namespace Motor.Claim.API.Controllers
         }
 
         [HttpGet("my-claims")]
+        [Authorize(Policy = "CustomerOnly")]
         public async Task<IActionResult> GetMyClaims()
         {
             var userId = GetCurrentUserId();
@@ -93,6 +97,17 @@ namespace Motor.Claim.API.Controllers
                 VehicleDamageRearRightDocument = x.VehicleDamageRearRightDocument,
                 Status = x.Status
             }).ToList();
+
+            return Ok(response);
+        }
+
+        [HttpGet("all")]
+        [Authorize(Policy = "OfficerOrAdmin")]
+        public async Task<IActionResult> GetAllClaims()
+        {
+            var result = await _getAllClaimsQueryHandler.Handle(new GetAllClaimsQuery());
+
+            var response = result.Select(MapResponse).ToList();
 
             return Ok(response);
         }

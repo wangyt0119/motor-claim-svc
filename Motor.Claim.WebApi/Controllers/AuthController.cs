@@ -2,6 +2,9 @@
 using Motor.Claim.Application.Dtos.Auth;
 using Motor.Claim.Application.Services;
 
+using Microsoft.AspNetCore.Authorization;
+using Motor.Claim.Domain.Enums;
+
 namespace Motor.Claim.WebApi.Controllers
 {
     [ApiController]
@@ -27,6 +30,41 @@ namespace Motor.Claim.WebApi.Controllers
                     user.UserId,
                     user.FullName,
                     user.Email,
+                    user.Role,
+                    user.IdType,
+                    user.NRIC,
+                    user.PassportNo,
+                    user.IssueCountry,
+                    user.MobileCountry,
+                    user.MobileNumber,
+                    user.IsMaybankGroupEmployee
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("create-user")]
+        [Authorize(Policy = "AdminOnly")]
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserWithRoleRequest request)
+        {
+            try
+            {
+                if (request.Role == UserRole.Customer)
+                {
+                    throw new ArgumentException("Use /api/auth/register for customer registration.");
+                }
+
+                var user = await _userService.RegisterAsync(request, request.Role);
+
+                return Ok(new
+                {
+                    user.UserId,
+                    user.FullName,
+                    user.Email,
+                    user.Role,
                     user.IdType,
                     user.NRIC,
                     user.PassportNo,

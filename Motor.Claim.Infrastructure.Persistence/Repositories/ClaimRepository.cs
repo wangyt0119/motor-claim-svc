@@ -11,6 +11,13 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
         {
         }
 
+        public async Task<List<ClaimEntity>> GetAllAsync()
+        {
+            return await _context.Claims
+                .Include(x => x.Coverage)
+                .ToListAsync();
+        }
+
         public async Task<List<ClaimEntity>> GetByUserIdAsync(Guid userId)
         {
             return await _context.Claims

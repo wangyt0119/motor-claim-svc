@@ -35,6 +35,9 @@ namespace Motor.Claim.Domain.Entities
         public bool IsMaybankGroupEmployee { get; set; }
 
         [Required]
+        public UserRole Role { get; set; }
+
+        [Required]
         public string PasswordHash { get; set; }
 
         public ICollection<CoverageEntity> Coverages { get; set; } = new List<CoverageEntity>();

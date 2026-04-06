@@ -6,5 +6,6 @@
         public Guid UserId { get; set; }
         public string FullName { get; set; }
         public string Email { get; set; }
+        public Motor.Claim.Domain.Enums.UserRole Role { get; set; }
     }
 }

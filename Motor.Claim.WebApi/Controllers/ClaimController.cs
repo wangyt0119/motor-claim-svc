@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using Motor.Claim.Application.Dtos.Claim;
 using Motor.Claim.Application.Features.Claim.Commands;
 using Motor.Claim.Application.Features.Claim.Queries;
+using Motor.Claim.Application.Dtos.Workshop;
+using Motor.Claim.Application.Services;
 
 namespace Motor.Claim.API.Controllers
 {
@@ -13,15 +16,18 @@ namespace Motor.Claim.API.Controllers
         private readonly CreateClaimCommandHandler _createClaimCommandHandler;
         private readonly GetMyClaimsQueryHandler _getMyClaimsQueryHandler;
         private readonly GetAllClaimsQueryHandler _getAllClaimsQueryHandler;
+        private readonly ClaimService _claimService;
 
         public ClaimController(
             CreateClaimCommandHandler createClaimCommandHandler,
             GetMyClaimsQueryHandler getMyClaimsQueryHandler,
-            GetAllClaimsQueryHandler getAllClaimsQueryHandler)
+            GetAllClaimsQueryHandler getAllClaimsQueryHandler,
+            ClaimService claimService)
         {
             _createClaimCommandHandler = createClaimCommandHandler;
             _getMyClaimsQueryHandler = getMyClaimsQueryHandler;
             _getAllClaimsQueryHandler = getAllClaimsQueryHandler;
+            _claimService = claimService;
         }
 
         [HttpPost]
@@ -75,28 +81,7 @@ namespace Motor.Claim.API.Controllers
 
             var result = await _getMyClaimsQueryHandler.Handle(query);
 
-            var response = result.Select(x => new ClaimResponse
-            {
-                ClaimId = x.ClaimId,
-                UserId = x.UserId,
-                CoverageId = x.CoverageId,
-                IncidentDate = x.IncidentDate,
-                CreatedAt = x.CreatedAt,
-                AllClaimType = x.AllClaimType,
-                MotorClaimType = x.MotorClaimType,
-                IncidentDescription = x.IncidentDescription,
-                PoliceReportDocument = x.PoliceReportDocument,
-                VehicleOwnershipCertificateDocument = x.VehicleOwnershipCertificateDocument,
-                IdentityDocumentFront = x.IdentityDocumentFront,
-                IdentityDocumentBack = x.IdentityDocumentBack,
-                DrivingLicenseFront = x.DrivingLicenseFront,
-                DrivingLicenseBack = x.DrivingLicenseBack,
-                VehicleDamageFrontLeftDocument = x.VehicleDamageFrontLeftDocument,
-                VehicleDamageFrontRightDocument = x.VehicleDamageFrontRightDocument,
-                VehicleDamageRearLeftDocument = x.VehicleDamageRearLeftDocument,
-                VehicleDamageRearRightDocument = x.VehicleDamageRearRightDocument,
-                Status = x.Status
-            }).ToList();
+            var response = result.Select(MapResponse).ToList();
 
             return Ok(response);
         }
@@ -110,6 +95,70 @@ namespace Motor.Claim.API.Controllers
             var response = result.Select(MapResponse).ToList();
 
             return Ok(response);
+        }
+
+        [HttpPost("{id:guid}/approve")]
+        [Authorize(Policy = "OfficerOrAdmin")]
+        public async Task<IActionResult> Approve(Guid id, [FromBody] OfficerDecisionRequest request)
+        {
+            try
+            {
+                var officerUserId = GetCurrentUserId();
+                var result = await _claimService.ApproveAsync(id, officerUserId, request.Note);
+                return Ok(MapResponse(result));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{id:guid}/reject")]
+        [Authorize(Policy = "OfficerOrAdmin")]
+        public async Task<IActionResult> Reject(Guid id, [FromBody] OfficerDecisionRequest request)
+        {
+            try
+            {
+                var officerUserId = GetCurrentUserId();
+                var result = await _claimService.RejectAsync(id, officerUserId, request.Note);
+                return Ok(MapResponse(result));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{id:guid}/request-info")]
+        [Authorize(Policy = "OfficerOrAdmin")]
+        public async Task<IActionResult> RequestInfo(Guid id, [FromBody] RequestInfoRequest request)
+        {
+            try
+            {
+                var officerUserId = GetCurrentUserId();
+                var result = await _claimService.RequestInfoAsync(id, officerUserId, request.RequestedItems, request.Note);
+                return Ok(MapResponse(result));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{id:guid}/customer-response")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> SubmitCustomerResponse(Guid id, [FromBody] CustomerResponseRequest request)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _claimService.SubmitCustomerResponseAsync(id, userId, request.ResponseNote, request.ResponseDocuments);
+                return Ok(MapResponse(result));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         private static ClaimResponse MapResponse(Motor.Claim.Domain.Entities.ClaimEntity claim)
@@ -134,8 +183,68 @@ namespace Motor.Claim.API.Controllers
                 VehicleDamageFrontRightDocument = claim.VehicleDamageFrontRightDocument,
                 VehicleDamageRearLeftDocument = claim.VehicleDamageRearLeftDocument,
                 VehicleDamageRearRightDocument = claim.VehicleDamageRearRightDocument,
-                Status = claim.Status
+                Status = claim.Status,
+                ReviewStatus = claim.ReviewStatus,
+                STPStatus = claim.STPStatus,
+                IsSTPApproved = claim.IsSTPApproved,
+                ValidationResult = claim.ValidationResult,
+                OfficerDecisionNote = claim.OfficerDecisionNote,
+                RequestedItems = claim.RequestedItems,
+                CustomerResponseNote = claim.CustomerResponseNote,
+                ResponseDocuments = DeserializeDocuments(claim.ResponseDocuments),
+                RequestedAt = claim.RequestedAt,
+                RespondedAt = claim.RespondedAt,
+                DecidedAt = claim.DecidedAt,
+                ReviewedByUserId = claim.ReviewedByUserId,
+                WorkshopAppointment = MapWorkshopAppointment(claim.WorkshopAppointment),
+                WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate)
             };
+        }
+
+        private static List<string> DeserializeDocuments(string? payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(payload) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        private static WorkshopAppointmentResponse? MapWorkshopAppointment(Motor.Claim.Domain.Entities.WorkshopAppointmentEntity? appointment)
+        {
+            if (appointment?.Workshop == null)
+            {
+                return null;
+            }
+
+            return new WorkshopAppointmentResponse
+            {
+                AppointmentId = appointment.AppointmentId,
+                ClaimId = appointment.ClaimId,
+                WorkshopId = appointment.WorkshopId,
+                WorkshopName = appointment.Workshop.Name,
+                WorkshopState = appointment.Workshop.State,
+                WorkshopAddress = appointment.Workshop.Address,
+                PreferredDate = appointment.PreferredDate,
+                TimeSlotStart = appointment.TimeSlotStart,
+                TimeSlotEnd = appointment.TimeSlotEnd,
+                Status = appointment.Status,
+                Notes = appointment.Notes,
+                CreatedAt = appointment.CreatedAt
+            };
+        }
+
+        private static WorkshopRepairEstimateResponse? MapWorkshopRepairEstimate(Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity? estimate)
+        {
+            return estimate == null ? null : WorkshopRepairEstimateService.MapResponse(estimate);
         }
 
         private Guid GetCurrentUserId()

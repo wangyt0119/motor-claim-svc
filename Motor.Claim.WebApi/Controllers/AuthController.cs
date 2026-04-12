@@ -57,7 +57,7 @@ namespace Motor.Claim.WebApi.Controllers
                     throw new ArgumentException("Use /api/auth/register for customer registration.");
                 }
 
-                var user = await _userService.RegisterAsync(request, request.Role);
+                var user = await _userService.RegisterAsync(request, request.Role, request.WorkshopId);
 
                 return Ok(new
                 {
@@ -71,7 +71,8 @@ namespace Motor.Claim.WebApi.Controllers
                     user.IssueCountry,
                     user.MobileCountry,
                     user.MobileNumber,
-                    user.IsMaybankGroupEmployee
+                    user.IsMaybankGroupEmployee,
+                    user.WorkshopId
                 });
             }
             catch (ArgumentException ex)
@@ -91,6 +92,44 @@ namespace Motor.Claim.WebApi.Controllers
             }
 
             return Ok(result);
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> Me()
+        {
+            var userIdClaim = User.FindFirst("UserId")?.Value;
+
+            if (!Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized("Invalid or missing UserId claim.");
+            }
+
+            var profile = await _userService.GetProfileAsync(userId);
+
+            return profile == null ? NotFound() : Ok(profile);
+        }
+
+        [HttpPut("me")]
+        [Authorize]
+        public async Task<IActionResult> UpdateMe([FromBody] UpdateMyProfileRequest request)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst("UserId")?.Value;
+
+                if (!Guid.TryParse(userIdClaim, out var userId))
+                {
+                    return Unauthorized("Invalid or missing UserId claim.");
+                }
+
+                var profile = await _userService.UpdateProfileAsync(userId, request);
+                return Ok(profile);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
     }
 }

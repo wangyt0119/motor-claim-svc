@@ -13,6 +13,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
         public DbSet<UserEntity> Users { get; set; }
         public DbSet<CoverageEntity> Coverages { get; set; }
         public DbSet<ClaimEntity> Claims { get; set; }
+        public DbSet<WorkshopEntity> Workshops { get; set; }
+        public DbSet<WorkshopAppointmentEntity> WorkshopAppointments { get; set; }
+        public DbSet<WorkshopRepairEstimateEntity> WorkshopRepairEstimates { get; set; }
+        public DbSet<SystemActivityLogEntity> SystemActivityLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -35,6 +39,70 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
                 .WithMany(cv => cv.Claims)
                 .HasForeignKey(c => c.CoverageId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopEntity>()
+                .Property(x => x.Name)
+                .HasMaxLength(200);
+
+            modelBuilder.Entity<WorkshopEntity>()
+                .Property(x => x.State)
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<WorkshopAppointmentEntity>()
+                .HasOne(x => x.Claim)
+                .WithOne(x => x.WorkshopAppointment)
+                .HasForeignKey<WorkshopAppointmentEntity>(x => x.ClaimId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WorkshopAppointmentEntity>()
+                .HasOne(x => x.Workshop)
+                .WithMany(x => x.Appointments)
+                .HasForeignKey(x => x.WorkshopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopRepairEstimateEntity>()
+                .HasKey(x => x.EstimateId);
+
+            modelBuilder.Entity<WorkshopRepairEstimateEntity>()
+                .HasOne(x => x.Claim)
+                .WithOne(x => x.WorkshopRepairEstimate)
+                .HasForeignKey<WorkshopRepairEstimateEntity>(x => x.ClaimId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WorkshopRepairEstimateEntity>()
+                .HasOne(x => x.Workshop)
+                .WithMany(x => x.RepairEstimates)
+                .HasForeignKey(x => x.WorkshopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopRepairEstimateEntity>()
+                .Property(x => x.TotalAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<UserEntity>()
+                .HasOne(x => x.Workshop)
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.WorkshopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SystemActivityLogEntity>()
+                .Property(x => x.Module)
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<SystemActivityLogEntity>()
+                .Property(x => x.Action)
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<SystemActivityLogEntity>()
+                .Property(x => x.HttpMethod)
+                .HasMaxLength(10);
+
+            modelBuilder.Entity<SystemActivityLogEntity>()
+                .Property(x => x.UserRole)
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<SystemActivityLogEntity>()
+                .HasIndex(x => x.CreatedAt);
         }
     }
 }

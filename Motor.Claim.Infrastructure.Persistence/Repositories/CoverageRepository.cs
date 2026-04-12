@@ -16,6 +16,23 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
             return await _context.Coverages
                 .Where(x => x.UserId == userId)
                 .Include(x => x.Claims)
+                    .ThenInclude(x => x.WorkshopAppointment)
+                        .ThenInclude(x => x.Workshop)
+                .Include(x => x.Claims)
+                    .ThenInclude(x => x.WorkshopRepairEstimate)
+                        .ThenInclude(x => x.Workshop)
+                .ToListAsync();
+        }
+
+        public async Task<List<CoverageEntity>> GetAllWithClaimsAsync()
+        {
+            return await _context.Coverages
+                .Include(x => x.Claims)
+                    .ThenInclude(x => x.WorkshopAppointment)
+                        .ThenInclude(x => x.Workshop)
+                .Include(x => x.Claims)
+                    .ThenInclude(x => x.WorkshopRepairEstimate)
+                        .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }
     }

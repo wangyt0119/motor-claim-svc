@@ -37,6 +37,12 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CustomerResponseNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("DrivingLicenseBack")
                         .HasColumnType("nvarchar(max)");
 
@@ -56,11 +62,39 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsSTPApproved")
+                        .HasColumnType("bit");
+
                     b.Property<int?>("MotorClaimType")
                         .HasColumnType("int");
 
+                    b.Property<string>("OfficerDecisionNote")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PoliceReportDocument")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedItems")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResponseDocuments")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReviewStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("STPStatus")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -68,6 +102,9 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ValidationResult")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("VehicleDamageFrontLeftDocument")
                         .HasColumnType("nvarchar(max)");
@@ -98,6 +135,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CoverageId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorizedDriver")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CoverageType")
                         .IsRequired()
@@ -176,9 +217,233 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("WorkshopId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("UserId");
 
+                    b.HasIndex("WorkshopId");
+
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.SystemActivityLogEntity", b =>
+                {
+                    b.Property<Guid>("LogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsSuccess")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("QueryString")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserRole")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("LogId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("SystemActivityLogs");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopAppointmentEntity", b =>
+                {
+                    b.Property<Guid>("AppointmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("PreferredDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<TimeSpan>("TimeSlotEnd")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("TimeSlotStart")
+                        .HasColumnType("time");
+
+                    b.Property<Guid>("WorkshopId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("AppointmentId");
+
+                    b.HasIndex("ClaimId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkshopId");
+
+                    b.ToTable("WorkshopAppointments");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopEntity", b =>
+                {
+                    b.Property<Guid>("WorkshopId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BankAccountHolderName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BankAccountNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BankName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Fax")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPanelWorkshop")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("WorkshopId");
+
+                    b.ToTable("Workshops");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", b =>
+                {
+                    b.Property<Guid>("EstimateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsStpApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ReceiptOrQuotationDocument")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestedItems")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReviewMode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SubmittedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SupportingDocuments")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("WorkshopId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("EstimateId");
+
+                    b.HasIndex("ClaimId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkshopId");
+
+                    b.ToTable("WorkshopRepairEstimates");
                 });
 
             modelBuilder.Entity("Motor.Claim.Domain.Entities.ClaimEntity", b =>
@@ -211,6 +476,61 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.UserEntity", b =>
+                {
+                    b.HasOne("Motor.Claim.Domain.Entities.WorkshopEntity", "Workshop")
+                        .WithMany("Users")
+                        .HasForeignKey("WorkshopId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Workshop");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopAppointmentEntity", b =>
+                {
+                    b.HasOne("Motor.Claim.Domain.Entities.ClaimEntity", "Claim")
+                        .WithOne("WorkshopAppointment")
+                        .HasForeignKey("Motor.Claim.Domain.Entities.WorkshopAppointmentEntity", "ClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Motor.Claim.Domain.Entities.WorkshopEntity", "Workshop")
+                        .WithMany("Appointments")
+                        .HasForeignKey("WorkshopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Claim");
+
+                    b.Navigation("Workshop");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", b =>
+                {
+                    b.HasOne("Motor.Claim.Domain.Entities.ClaimEntity", "Claim")
+                        .WithOne("WorkshopRepairEstimate")
+                        .HasForeignKey("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", "ClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Motor.Claim.Domain.Entities.WorkshopEntity", "Workshop")
+                        .WithMany("RepairEstimates")
+                        .HasForeignKey("WorkshopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Claim");
+
+                    b.Navigation("Workshop");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.ClaimEntity", b =>
+                {
+                    b.Navigation("WorkshopAppointment");
+
+                    b.Navigation("WorkshopRepairEstimate");
+                });
+
             modelBuilder.Entity("Motor.Claim.Domain.Entities.CoverageEntity", b =>
                 {
                     b.Navigation("Claims");
@@ -221,6 +541,15 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Navigation("Claims");
 
                     b.Navigation("Coverages");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopEntity", b =>
+                {
+                    b.Navigation("Appointments");
+
+                    b.Navigation("RepairEstimates");
+
+                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }

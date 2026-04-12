@@ -14,12 +14,17 @@ namespace Motor.Claim.Application.Services
     public class UserService
     {
         private readonly IUserRepository _userRepository;
+        private readonly IWorkshopRepository _workshopRepository;
         private readonly PasswordHasher<UserEntity> _passwordHasher;
         private readonly IConfiguration _configuration;
 
-        public UserService(IUserRepository userRepository, IConfiguration configuration)
+        public UserService(
+            IUserRepository userRepository,
+            IWorkshopRepository workshopRepository,
+            IConfiguration configuration)
         {
             _userRepository = userRepository;
+            _workshopRepository = workshopRepository;
             _configuration = configuration;
             _passwordHasher = new PasswordHasher<UserEntity>();
         }
@@ -30,6 +35,11 @@ namespace Motor.Claim.Application.Services
         }
 
         public async Task<UserEntity> RegisterAsync(RegisterUserRequest request, UserRole role)
+        {
+            return await RegisterAsync(request, role, null);
+        }
+
+        public async Task<UserEntity> RegisterAsync(RegisterUserRequest request, UserRole role, Guid? workshopId)
         {
             var existingUser = await _userRepository.GetByEmailAsync(request.Email);
             if (existingUser != null)
@@ -63,6 +73,31 @@ namespace Motor.Claim.Application.Services
                 request.NRIC = null;
             }
 
+            if (role == UserRole.PanelWorkshop && !workshopId.HasValue)
+            {
+                throw new ArgumentException("WorkshopId is required for PanelWorkshop users.");
+            }
+
+            if (role == UserRole.PanelWorkshop)
+            {
+                var workshop = await _workshopRepository.GetByIdAsync(workshopId!.Value);
+
+                if (workshop == null)
+                {
+                    throw new ArgumentException("Selected workshop does not exist.");
+                }
+
+                if (!workshop.IsPanelWorkshop)
+                {
+                    throw new ArgumentException("Selected workshop is not marked as a panel workshop.");
+                }
+
+                if (!workshop.IsActive)
+                {
+                    throw new ArgumentException("Selected workshop is not active.");
+                }
+            }
+
             var user = new UserEntity
             {
                 CreatedAt = DateTime.Now,
@@ -76,7 +111,8 @@ namespace Motor.Claim.Application.Services
                 MobileNumber = request.MobileNumber,
                 Email = request.Email,
                 IsMaybankGroupEmployee = request.IsMaybankGroupEmployee,
-                Role = role
+                Role = role,
+                WorkshopId = role == UserRole.PanelWorkshop ? workshopId : null
             };
 
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
@@ -100,6 +136,9 @@ namespace Motor.Claim.Application.Services
             }
 
             var token = GenerateJwtToken(user);
+            var workshopName = user.WorkshopId.HasValue
+                ? (await _workshopRepository.GetByIdAsync(user.WorkshopId.Value))?.Name
+                : null;
 
             return new LoginResponse
             {
@@ -107,8 +146,125 @@ namespace Motor.Claim.Application.Services
                 UserId = user.UserId,
                 FullName = user.FullName,
                 Email = user.Email,
-                Role = user.Role
+                Role = user.Role,
+                WorkshopId = user.WorkshopId,
+                WorkshopName = workshopName
             };
+        }
+
+        public async Task<UserProfileResponse?> GetProfileAsync(Guid userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                return null;
+            }
+
+            var workshop = user.WorkshopId.HasValue
+                ? await _workshopRepository.GetByIdAsync(user.WorkshopId.Value)
+                : null;
+
+            return new UserProfileResponse
+            {
+                UserId = user.UserId,
+                FullName = user.FullName,
+                IdType = user.IdType,
+                Nric = user.NRIC,
+                PassportNo = user.PassportNo,
+                IssueCountry = user.IssueCountry,
+                MobileCountry = user.MobileCountry,
+                MobileNumber = user.MobileNumber,
+                Email = user.Email,
+                IsMaybankGroupEmployee = user.IsMaybankGroupEmployee,
+                Role = user.Role,
+                WorkshopId = user.WorkshopId,
+                Workshop = workshop == null
+                    ? null
+                    : new Motor.Claim.Application.Dtos.Workshop.WorkshopResponse
+                    {
+                        WorkshopId = workshop.WorkshopId,
+                        Name = workshop.Name,
+                        State = workshop.State,
+                        Address = workshop.Address,
+                        Phone = DeserializeOptionalList(workshop.Phone),
+                        Fax = workshop.Fax,
+                        Email = DeserializeOptionalList(workshop.Email),
+                        BankName = workshop.BankName,
+                        BankAccountNumber = workshop.BankAccountNumber,
+                        BankAccountHolderName = workshop.BankAccountHolderName,
+                        IsPanelWorkshop = workshop.IsPanelWorkshop,
+                        IsActive = workshop.IsActive
+                    }
+            };
+        }
+
+        public async Task<UserProfileResponse> UpdateProfileAsync(Guid userId, UpdateMyProfileRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new ArgumentException("User not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FullName))
+            {
+                throw new ArgumentException("Full name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.MobileNumber))
+            {
+                throw new ArgumentException("Mobile number is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                throw new ArgumentException("Email is required.");
+            }
+
+            var normalizedEmail = request.Email.Trim();
+            var existingUser = await _userRepository.GetByEmailAsync(normalizedEmail);
+            if (existingUser != null && existingUser.UserId != userId)
+            {
+                throw new ArgumentException("Email already exists.");
+            }
+
+            if (request.IdType == IdType.NRIC)
+            {
+                if (string.IsNullOrWhiteSpace(request.Nric))
+                {
+                    throw new ArgumentException("NRIC is required when ID Type is NRIC.");
+                }
+
+                user.NRIC = request.Nric.Trim();
+                user.PassportNo = null;
+                user.IssueCountry = null;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(request.PassportNo))
+                {
+                    throw new ArgumentException("Passport number is required when ID Type is Passport.");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.IssueCountry))
+                {
+                    throw new ArgumentException("Issue country is required when ID Type is Passport.");
+                }
+
+                user.NRIC = null;
+                user.PassportNo = request.PassportNo.Trim();
+                user.IssueCountry = request.IssueCountry.Trim();
+            }
+
+            user.FullName = request.FullName.Trim();
+            user.IdType = request.IdType;
+            user.MobileCountry = request.MobileCountry;
+            user.MobileNumber = request.MobileNumber.Trim();
+            user.Email = normalizedEmail;
+
+            await _userRepository.UpdateAsync(user);
+
+            return (await GetProfileAsync(userId))!;
         }
 
         private string GenerateJwtToken(UserEntity user)
@@ -130,6 +286,7 @@ namespace Motor.Claim.Application.Services
                 new System.Security.Claims.Claim(JwtRegisteredClaimNames.UniqueName, user.FullName),
                 new System.Security.Claims.Claim(ClaimTypes.Role, user.Role.ToString()),
                 new System.Security.Claims.Claim("role", user.Role.ToString()),
+                new System.Security.Claims.Claim("WorkshopId", user.WorkshopId?.ToString() ?? string.Empty),
                 new System.Security.Claims.Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
@@ -143,6 +300,23 @@ namespace Motor.Claim.Application.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private static List<string> DeserializeOptionalList(string? payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(payload) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string> { payload.Trim() };
+            }
         }
     }
 }

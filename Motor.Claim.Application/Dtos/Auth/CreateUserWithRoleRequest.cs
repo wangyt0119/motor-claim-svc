@@ -7,5 +7,7 @@ namespace Motor.Claim.Application.Dtos.Auth
     {
         [Required]
         public UserRole Role { get; set; }
+
+        public Guid? WorkshopId { get; set; }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Motor.Claim.Application.Features.Claim.Commands;
+using System.Text.Json;
+using Motor.Claim.Application.Features.Claim.Commands;
 using Motor.Claim.Application.Interfaces;
 using Motor.Claim.Domain.Entities;
 using Motor.Claim.Domain.Enums;
@@ -9,11 +10,16 @@ namespace Motor.Claim.Application.Services
     {
         private readonly IClaimRepository _claimRepository;
         private readonly ICoverageRepository _coverageRepository;
+        private readonly StpValidationService _stpValidationService;
 
-        public ClaimService(IClaimRepository claimRepository, ICoverageRepository coverageRepository)
+        public ClaimService(
+            IClaimRepository claimRepository,
+            ICoverageRepository coverageRepository,
+            StpValidationService stpValidationService)
         {
             _claimRepository = claimRepository;
             _coverageRepository = coverageRepository;
+            _stpValidationService = stpValidationService;
         }
 
         public async Task<ClaimEntity> CreateAsync(CreateClaimCommand command)
@@ -57,10 +63,24 @@ namespace Motor.Claim.Application.Services
                 VehicleDamageFrontRightDocument = command.VehicleDamageFrontRightDocument,
                 VehicleDamageRearLeftDocument = command.VehicleDamageRearLeftDocument,
                 VehicleDamageRearRightDocument = command.VehicleDamageRearRightDocument,
-                Status = "Pending"
+                Status = "Pending",
+                ReviewStatus = "Pending"
             };
 
-            return await _claimRepository.AddAsync(claim);
+            var savedClaim = await _claimRepository.AddAsync(claim);
+
+            var stpResult = await _stpValidationService.ValidateAsync(savedClaim, coverage);
+
+            savedClaim.STPStatus = stpResult.STPStatus;
+            savedClaim.IsSTPApproved = stpResult.IsApproved;
+            savedClaim.ValidationResult = StpValidationService.SerializeResult(stpResult);
+            savedClaim.Status = stpResult.IsApproved ? "Approved" : "Pending Manual Review";
+            savedClaim.ReviewStatus = stpResult.IsApproved ? "Approved" : "PendingManualReview";
+            savedClaim.DecidedAt = stpResult.IsApproved ? DateTime.UtcNow : null;
+
+            await _claimRepository.UpdateAsync(savedClaim);
+
+            return savedClaim;
         }
 
         public async Task<List<ClaimEntity>> GetByUserIdAsync(Guid userId)
@@ -73,13 +93,77 @@ namespace Motor.Claim.Application.Services
             return await _claimRepository.GetAllAsync();
         }
 
+        public async Task<ClaimEntity> ApproveAsync(Guid claimId, Guid officerUserId, string? note)
+        {
+            var claim = await GetExistingClaimAsync(claimId);
+            claim.Status = "Approved";
+            claim.ReviewStatus = "Approved";
+            claim.OfficerDecisionNote = note;
+            claim.DecidedAt = DateTime.UtcNow;
+            claim.ReviewedByUserId = officerUserId;
+
+            await _claimRepository.UpdateAsync(claim);
+            return claim;
+        }
+
+        public async Task<ClaimEntity> RejectAsync(Guid claimId, Guid officerUserId, string? note)
+        {
+            var claim = await GetExistingClaimAsync(claimId);
+            claim.Status = "Rejected";
+            claim.ReviewStatus = "Rejected";
+            claim.OfficerDecisionNote = note;
+            claim.DecidedAt = DateTime.UtcNow;
+            claim.ReviewedByUserId = officerUserId;
+
+            await _claimRepository.UpdateAsync(claim);
+            return claim;
+        }
+
+        public async Task<ClaimEntity> RequestInfoAsync(Guid claimId, Guid officerUserId, string requestedItems, string? note)
+        {
+            if (string.IsNullOrWhiteSpace(requestedItems))
+            {
+                throw new ArgumentException("RequestedItems is required.");
+            }
+
+            var claim = await GetExistingClaimAsync(claimId);
+            claim.Status = "Pending Customer Action";
+            claim.ReviewStatus = "PendingCustomerAction";
+            claim.RequestedItems = requestedItems;
+            claim.OfficerDecisionNote = note;
+            claim.RequestedAt = DateTime.UtcNow;
+            claim.DecidedAt = null;
+            claim.ReviewedByUserId = officerUserId;
+
+            await _claimRepository.UpdateAsync(claim);
+            return claim;
+        }
+
+        public async Task<ClaimEntity> SubmitCustomerResponseAsync(Guid claimId, Guid userId, string? responseNote, List<string> responseDocuments)
+        {
+            var claim = await GetExistingClaimAsync(claimId);
+
+            if (claim.UserId != userId)
+            {
+                throw new ArgumentException("You are not allowed to respond to this claim.");
+            }
+
+            claim.Status = "Customer Responded";
+            claim.ReviewStatus = "CustomerResponded";
+            claim.CustomerResponseNote = responseNote;
+            claim.ResponseDocuments = JsonSerializer.Serialize(responseDocuments ?? new List<string>());
+            claim.RespondedAt = DateTime.UtcNow;
+
+            await _claimRepository.UpdateAsync(claim);
+            return claim;
+        }
+
         private static void ValidateDocuments(CreateClaimCommand command)
         {
             var missingDocuments = new List<string>();
 
             AddIfMissing(missingDocuments, command.PoliceReportDocument, nameof(command.PoliceReportDocument));
             AddIfMissing(missingDocuments, command.IdentityDocumentFront, nameof(command.IdentityDocumentFront));
-            AddIfMissing(missingDocuments, command.IdentityDocumentBack, nameof(command.IdentityDocumentBack));
 
             if (command.AllClaimType != AllClaimType.VehicleClaim)
             {
@@ -95,11 +179,6 @@ namespace Motor.Claim.Application.Services
             {
                 AddIfMissing(missingDocuments, command.VehicleOwnershipCertificateDocument, nameof(command.VehicleOwnershipCertificateDocument));
                 AddIfMissing(missingDocuments, command.DrivingLicenseFront, nameof(command.DrivingLicenseFront));
-                AddIfMissing(missingDocuments, command.DrivingLicenseBack, nameof(command.DrivingLicenseBack));
-                AddIfMissing(missingDocuments, command.VehicleDamageFrontLeftDocument, nameof(command.VehicleDamageFrontLeftDocument));
-                AddIfMissing(missingDocuments, command.VehicleDamageFrontRightDocument, nameof(command.VehicleDamageFrontRightDocument));
-                AddIfMissing(missingDocuments, command.VehicleDamageRearLeftDocument, nameof(command.VehicleDamageRearLeftDocument));
-                AddIfMissing(missingDocuments, command.VehicleDamageRearRightDocument, nameof(command.VehicleDamageRearRightDocument));
             }
 
             if (missingDocuments.Count > 0)
@@ -114,6 +193,17 @@ namespace Motor.Claim.Application.Services
             {
                 missingDocuments.Add(fieldName);
             }
+        }
+
+        private async Task<ClaimEntity> GetExistingClaimAsync(Guid claimId)
+        {
+            var claim = await _claimRepository.GetByIdAsync(claimId);
+            if (claim == null)
+            {
+                throw new ArgumentException("Claim not found.");
+            }
+
+            return claim;
         }
     }
 }

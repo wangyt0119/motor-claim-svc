@@ -10,6 +10,7 @@ namespace Motor.Claim.Application.Dtos.Coverage
         public string InsuredPersonName { get; set; } = string.Empty;
         public string VehicleNo { get; set; } = string.Empty;
         public string CoverageType { get; set; } = string.Empty;
+        public string? AuthorizedDriver { get; set; }
         public DateTime EffectiveDate { get; set; }
         public DateTime ExpiryDate { get; set; }
         public List<ClaimResponse> Claims { get; set; } = new();

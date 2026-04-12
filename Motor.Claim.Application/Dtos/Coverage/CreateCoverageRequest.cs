@@ -6,6 +6,9 @@ namespace Motor.Claim.Application.Dtos.Coverage
     {
         [Required]
         public string InsuredPersonName { get; set; }
+        
+        [Required]
+        public string AuthorizedDriver { get; set; }
 
         [Required]
         public string VehicleNo { get; set; }
@@ -18,5 +21,6 @@ namespace Motor.Claim.Application.Dtos.Coverage
 
         [Required]
         public DateTime ExpiryDate { get; set; }
+
     }
 }

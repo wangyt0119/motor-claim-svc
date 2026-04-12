@@ -4,6 +4,7 @@ namespace Motor.Claim.Domain.Enums
     {
         Customer = 1,
         Officer = 2,
-        Admin = 3
+        Admin = 3,
+        PanelWorkshop = 4
     }
 }

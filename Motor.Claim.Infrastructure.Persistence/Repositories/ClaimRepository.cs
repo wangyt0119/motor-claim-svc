@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Motor.Claim.Application.Interfaces;
 using Motor.Claim.Domain.Entities;
+using Motor.Claim.Domain.Enums;
 using Motor.Claim.Infrastructure.Persistence.Context;
 
 namespace Motor.Claim.Infrastructure.Persistence.Repositories
@@ -15,6 +16,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
         {
             return await _context.Claims
                 .Include(x => x.Coverage)
+                .Include(x => x.WorkshopAppointment)
+                    .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopRepairEstimate)
+                    .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }
 
@@ -23,6 +28,38 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
             return await _context.Claims
                 .Where(x => x.UserId == userId)
                 .Include(x => x.Coverage)
+                .Include(x => x.WorkshopAppointment)
+                    .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopRepairEstimate)
+                    .ThenInclude(x => x.Workshop)
+                .ToListAsync();
+        }
+
+        public async Task<ClaimEntity?> GetByIdWithDetailsAsync(Guid claimId)
+        {
+            return await _context.Claims
+                .Include(x => x.Coverage)
+                .Include(x => x.WorkshopAppointment)
+                    .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopRepairEstimate)
+                    .ThenInclude(x => x.Workshop)
+                .FirstOrDefaultAsync(x => x.ClaimId == claimId);
+        }
+
+        public async Task<List<ClaimEntity>> GetApprovedClaimsByWorkshopIdAsync(Guid workshopId)
+        {
+            return await _context.Claims
+                .Where(x =>
+                    x.WorkshopAppointment != null &&
+                    x.WorkshopAppointment.WorkshopId == workshopId &&
+                    (x.ReviewStatus == "Approved" ||
+                     x.STPStatus == StpStatus.AutoApproved ||
+                     x.IsSTPApproved))
+                .Include(x => x.Coverage)
+                .Include(x => x.WorkshopAppointment)
+                    .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopRepairEstimate)
+                    .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }
     }

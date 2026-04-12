@@ -40,6 +40,20 @@ namespace Motor.Claim.Domain.Entities
         public string? VehicleDamageRearRightDocument { get; set; }
 
         public string Status { get; set; } = "Pending";
+        public string ReviewStatus { get; set; } = "Pending";
+        public StpStatus STPStatus { get; set; } = StpStatus.Pending;
+        public bool IsSTPApproved { get; set; }
+        public string? ValidationResult { get; set; }
+        public string? OfficerDecisionNote { get; set; }
+        public string? RequestedItems { get; set; }
+        public string? CustomerResponseNote { get; set; }
+        public string? ResponseDocuments { get; set; }
+        public DateTime? RequestedAt { get; set; }
+        public DateTime? RespondedAt { get; set; }
+        public DateTime? DecidedAt { get; set; }
+        public Guid? ReviewedByUserId { get; set; }
+        public WorkshopAppointmentEntity? WorkshopAppointment { get; set; }
+        public WorkshopRepairEstimateEntity? WorkshopRepairEstimate { get; set; }
 
         [ForeignKey("UserId")]
         public UserEntity User { get; set; }

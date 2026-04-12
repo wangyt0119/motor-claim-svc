@@ -40,7 +40,10 @@ namespace Motor.Claim.Domain.Entities
         [Required]
         public string PasswordHash { get; set; }
 
+        public Guid? WorkshopId { get; set; }
+
         public ICollection<CoverageEntity> Coverages { get; set; } = new List<CoverageEntity>();
         public ICollection<ClaimEntity> Claims { get; set; } = new List<ClaimEntity>();
+        public WorkshopEntity? Workshop { get; set; }
     }
 }

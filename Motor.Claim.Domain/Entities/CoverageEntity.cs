@@ -15,6 +15,9 @@ namespace Motor.Claim.Domain.Entities
 
         [Required]
         public string InsuredPersonName { get; set; }
+        
+        [Required]
+        public string AuthorizedDriver { get; set; }
 
         [Required]
         public string VehicleNo { get; set; }

@@ -28,6 +28,7 @@ namespace Motor.Claim.Application.Services
                 InsuredPersonName = command.InsuredPersonName,
                 VehicleNo = command.VehicleNo,
                 CoverageType = command.CoverageType,
+                AuthorizedDriver = command.AuthorizedDriver,
                 EffectiveDate = command.EffectiveDate,
                 ExpiryDate = command.ExpiryDate
             };
@@ -38,6 +39,11 @@ namespace Motor.Claim.Application.Services
         public async Task<List<CoverageEntity>> GetByUserIdAsync(Guid userId)
         {
             return await _coverageRepository.GetByUserIdAsync(userId);
+        }
+
+        public async Task<List<CoverageEntity>> GetAllAsync()
+        {
+            return await _coverageRepository.GetAllWithClaimsAsync();
         }
     }
 }

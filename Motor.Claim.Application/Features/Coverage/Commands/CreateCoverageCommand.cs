@@ -12,6 +12,7 @@ namespace Motor.Claim.Application.Features.Coverage.Commands
         public string InsuredPersonName { get; set; }
         public string VehicleNo { get; set; }
         public string CoverageType { get; set; }
+        public string? AuthorizedDriver { get; set; }
         public DateTime EffectiveDate { get; set; }
         public DateTime ExpiryDate { get; set; }
     }

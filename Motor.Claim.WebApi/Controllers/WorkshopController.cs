@@ -6,6 +6,8 @@ using Motor.Claim.Application.Features.Workshop.Queries;
 using Motor.Claim.Application.Features.WorkshopAppointment.Commands;
 using Motor.Claim.Application.Features.WorkshopAppointment.Queries;
 using Motor.Claim.Application.Services;
+using Motor.Claim.WebApi.Services;
+using Stripe;
 using System.Text.Json;
 
 namespace Motor.Claim.API.Controllers
@@ -327,12 +329,112 @@ namespace Motor.Claim.API.Controllers
             return Ok(result.Select(WorkshopRepairEstimateService.MapResponse).ToList());
         }
 
+        [HttpGet("panel-workshop/payments")]
+        [Authorize(Policy = "PanelWorkshopOnly")]
+        public async Task<IActionResult> GetMyPayments([FromServices] WorkshopPaymentService workshopPaymentService)
+        {
+            var workshopId = GetCurrentWorkshopId();
+            var result = await workshopPaymentService.GetByWorkshopIdAsync(workshopId);
+            return Ok(result.Select(WorkshopPaymentService.MapResponse).ToList());
+        }
+
         [HttpGet("repair-estimates/all")]
         [Authorize(Policy = "OfficerOrAdmin")]
         public async Task<IActionResult> GetAllRepairEstimates()
         {
             var result = await _workshopRepairEstimateService.GetAllAsync();
             return Ok(result.Select(WorkshopRepairEstimateService.MapResponse).ToList());
+        }
+
+        [HttpGet("payments/all")]
+        [Authorize(Policy = "OfficerOrAdmin")]
+        public async Task<IActionResult> GetAllPayments([FromServices] WorkshopPaymentService workshopPaymentService)
+        {
+            var result = await workshopPaymentService.GetAllAsync();
+            return Ok(result.Select(WorkshopPaymentService.MapResponse).ToList());
+        }
+
+        [HttpGet("repair-estimates/{estimateId:guid}/payment")]
+        [Authorize(Policy = "OfficerOrAdmin")]
+        public async Task<IActionResult> GetPaymentByEstimate(Guid estimateId, [FromServices] WorkshopPaymentService workshopPaymentService)
+        {
+            var payment = await workshopPaymentService.GetByEstimateIdAsync(estimateId);
+            return payment == null ? NotFound() : Ok(WorkshopPaymentService.MapResponse(payment));
+        }
+
+        [HttpPost("me/stripe/account")]
+        [Authorize(Policy = "PanelWorkshopOnly")]
+        public async Task<IActionResult> CreateMyStripeConnectedAccount([FromServices] StripeConnectService stripeConnectService)
+        {
+            try
+            {
+                var workshopId = GetCurrentWorkshopId();
+                var result = await stripeConnectService.CreateConnectedAccountAsync(workshopId);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (StripeException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("me/stripe/onboarding-link")]
+        [Authorize(Policy = "PanelWorkshopOnly")]
+        public async Task<IActionResult> CreateMyStripeOnboardingLink([FromServices] StripeConnectService stripeConnectService)
+        {
+            try
+            {
+                var workshopId = GetCurrentWorkshopId();
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                var refreshUrl = $"{baseUrl}/api/Workshop/me/stripe/status";
+                var returnUrl = $"{baseUrl}/api/Workshop/me/stripe/status";
+                var result = await stripeConnectService.CreateOnboardingLinkAsync(workshopId, refreshUrl, returnUrl);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (StripeException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("me/stripe/status")]
+        [Authorize(Policy = "PanelWorkshopOnly")]
+        public async Task<IActionResult> GetMyStripeStatus([FromServices] StripeConnectService stripeConnectService)
+        {
+            try
+            {
+                var workshopId = GetCurrentWorkshopId();
+                var result = await stripeConnectService.GetWorkshopStripeStatusAsync(workshopId);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (StripeException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPost("repair-estimates/{estimateId:guid}/approve")]
@@ -401,6 +503,11 @@ namespace Motor.Claim.API.Controllers
                 BankName = workshop.BankName,
                 BankAccountNumber = workshop.BankAccountNumber,
                 BankAccountHolderName = workshop.BankAccountHolderName,
+                StripeConnectedAccountId = workshop.StripeConnectedAccountId,
+                StripeOnboardingStatus = workshop.StripeOnboardingStatus,
+                StripeChargesEnabled = workshop.StripeChargesEnabled,
+                StripePayoutsEnabled = workshop.StripePayoutsEnabled,
+                StripeLastSyncedAt = workshop.StripeLastSyncedAt,
                 IsPanelWorkshop = workshop.IsPanelWorkshop,
                 IsActive = workshop.IsActive
             };

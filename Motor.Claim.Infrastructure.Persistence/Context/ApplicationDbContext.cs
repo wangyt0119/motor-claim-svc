@@ -16,6 +16,7 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
         public DbSet<WorkshopEntity> Workshops { get; set; }
         public DbSet<WorkshopAppointmentEntity> WorkshopAppointments { get; set; }
         public DbSet<WorkshopRepairEstimateEntity> WorkshopRepairEstimates { get; set; }
+        public DbSet<WorkshopPaymentEntity> WorkshopPayments { get; set; }
         public DbSet<SystemActivityLogEntity> SystemActivityLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -48,6 +49,14 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
                 .Property(x => x.State)
                 .HasMaxLength(100);
 
+            modelBuilder.Entity<WorkshopEntity>()
+                .Property(x => x.StripeConnectedAccountId)
+                .HasMaxLength(255);
+
+            modelBuilder.Entity<WorkshopEntity>()
+                .Property(x => x.StripeOnboardingStatus)
+                .HasMaxLength(50);
+
             modelBuilder.Entity<WorkshopAppointmentEntity>()
                 .HasOne(x => x.Claim)
                 .WithOne(x => x.WorkshopAppointment)
@@ -78,6 +87,47 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
             modelBuilder.Entity<WorkshopRepairEstimateEntity>()
                 .Property(x => x.TotalAmount)
                 .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .HasKey(x => x.PaymentId);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .HasOne(x => x.Estimate)
+                .WithOne(x => x.Payment)
+                .HasForeignKey<WorkshopPaymentEntity>(x => x.EstimateId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .HasOne(x => x.Claim)
+                .WithOne(x => x.WorkshopPayment)
+                .HasForeignKey<WorkshopPaymentEntity>(x => x.ClaimId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .HasOne(x => x.Workshop)
+                .WithMany(x => x.Payments)
+                .HasForeignKey(x => x.WorkshopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .Property(x => x.Amount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .Property(x => x.Currency)
+                .HasMaxLength(10);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .Property(x => x.Status)
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .Property(x => x.Provider)
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<WorkshopPaymentEntity>()
+                .Property(x => x.ApprovalSource)
+                .HasMaxLength(50);
 
             modelBuilder.Entity<UserEntity>()
                 .HasOne(x => x.Workshop)

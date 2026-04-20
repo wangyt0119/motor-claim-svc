@@ -14,13 +14,18 @@ using Motor.Claim.Application.Services;
 using Motor.Claim.Infrastructure.Persistence.Context;
 using Motor.Claim.Infrastructure.Persistence.Repositories;
 using Motor.Claim.Infrastructure.Shared.Services;
+using Motor.Claim.WebApi.Configuration;
 using Motor.Claim.WebApi.Middleware;
+using Motor.Claim.WebApi.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Payments:Stripe"));
+builder.Services.Configure<SmtpEmailOptions>(builder.Configuration.GetSection("Notifications:Smtp"));
 
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
@@ -30,13 +35,18 @@ builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
 builder.Services.AddScoped<IWorkshopRepository, WorkshopRepository>();
 builder.Services.AddScoped<IWorkshopAppointmentRepository, WorkshopAppointmentRepository>();
 builder.Services.AddScoped<IWorkshopRepairEstimateRepository, WorkshopRepairEstimateRepository>();
+builder.Services.AddScoped<IWorkshopPaymentRepository, WorkshopPaymentRepository>();
 builder.Services.AddScoped<ISystemActivityLogRepository, SystemActivityLogRepository>();
+builder.Services.AddScoped<IWorkshopPaymentProviderResolver, WorkshopPaymentProviderResolver>();
+builder.Services.AddScoped<IEmailNotificationService, SmtpEmailNotificationService>();
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<CoverageService>();
 builder.Services.AddScoped<ClaimService>();
 builder.Services.AddScoped<WorkshopService>();
 builder.Services.AddScoped<WorkshopRepairEstimateService>();
+builder.Services.AddScoped<WorkshopPaymentService>();
+builder.Services.AddScoped<StripeConnectService>();
 builder.Services.AddScoped<StpValidationService>();
 builder.Services.AddScoped<SystemMonitoringService>();
 builder.Services.AddScoped<MockOcrExtractor>();

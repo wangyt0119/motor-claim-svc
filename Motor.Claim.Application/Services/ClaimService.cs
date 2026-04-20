@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using System.Text.Json;
 using Motor.Claim.Application.Features.Claim.Commands;
 using Motor.Claim.Application.Interfaces;
@@ -11,15 +13,21 @@ namespace Motor.Claim.Application.Services
         private readonly IClaimRepository _claimRepository;
         private readonly ICoverageRepository _coverageRepository;
         private readonly StpValidationService _stpValidationService;
+        private readonly IUserRepository _userRepository;
+        private readonly IEmailNotificationService _emailNotificationService;
 
         public ClaimService(
             IClaimRepository claimRepository,
             ICoverageRepository coverageRepository,
-            StpValidationService stpValidationService)
+            StpValidationService stpValidationService,
+            IUserRepository userRepository,
+            IEmailNotificationService emailNotificationService)
         {
             _claimRepository = claimRepository;
             _coverageRepository = coverageRepository;
             _stpValidationService = stpValidationService;
+            _userRepository = userRepository;
+            _emailNotificationService = emailNotificationService;
         }
 
         public async Task<ClaimEntity> CreateAsync(CreateClaimCommand command)
@@ -79,6 +87,7 @@ namespace Motor.Claim.Application.Services
             savedClaim.DecidedAt = stpResult.IsApproved ? DateTime.UtcNow : null;
 
             await _claimRepository.UpdateAsync(savedClaim);
+            await SendClaimCreatedNotificationAsync(savedClaim, coverage.VehicleNo);
 
             return savedClaim;
         }
@@ -103,6 +112,14 @@ namespace Motor.Claim.Application.Services
             claim.ReviewedByUserId = officerUserId;
 
             await _claimRepository.UpdateAsync(claim);
+            await NotifyCustomerAsync(
+                claim,
+                "Your motor claim has been approved",
+                BuildClaimStatusEmailBody(
+                    claim,
+                    "Your claim has been approved.",
+                    note,
+                    "You can proceed with the next steps in the system, including panel workshop selection if needed."));
             return claim;
         }
 
@@ -116,6 +133,14 @@ namespace Motor.Claim.Application.Services
             claim.ReviewedByUserId = officerUserId;
 
             await _claimRepository.UpdateAsync(claim);
+            await NotifyCustomerAsync(
+                claim,
+                "Your motor claim has been rejected",
+                BuildClaimStatusEmailBody(
+                    claim,
+                    "Your claim has been rejected.",
+                    note,
+                    "Please review the note from the claim officer for more details."));
             return claim;
         }
 
@@ -136,6 +161,14 @@ namespace Motor.Claim.Application.Services
             claim.ReviewedByUserId = officerUserId;
 
             await _claimRepository.UpdateAsync(claim);
+            await NotifyCustomerAsync(
+                claim,
+                "More information is needed for your claim",
+                BuildClaimStatusEmailBody(
+                    claim,
+                    "Your claim needs manual review and more information before a decision can be made.",
+                    note,
+                    $"Requested items: {requestedItems}"));
             return claim;
         }
 
@@ -155,6 +188,14 @@ namespace Motor.Claim.Application.Services
             claim.RespondedAt = DateTime.UtcNow;
 
             await _claimRepository.UpdateAsync(claim);
+            await NotifyCustomerAsync(
+                claim,
+                "We received your claim response",
+                BuildClaimStatusEmailBody(
+                    claim,
+                    "Your additional response and documents have been submitted successfully.",
+                    responseNote,
+                    "Our team will review the new information and continue processing your claim."));
             return claim;
         }
 
@@ -204,6 +245,75 @@ namespace Motor.Claim.Application.Services
             }
 
             return claim;
+        }
+
+        private async Task SendClaimCreatedNotificationAsync(ClaimEntity claim, string vehicleNo)
+        {
+            if (claim.IsSTPApproved || claim.STPStatus == StpStatus.AutoApproved)
+            {
+                await NotifyCustomerAsync(
+                    claim,
+                    "Your motor claim was submitted and auto-approved",
+                    BuildClaimStatusEmailBody(
+                        claim,
+                        "Your claim has been submitted successfully and approved automatically by STP.",
+                        null,
+                        "You can proceed to choose a panel workshop in the system."));
+                return;
+            }
+
+            await NotifyCustomerAsync(
+                claim,
+                "Your motor claim was submitted successfully",
+                $"""
+                <p>Your motor claim has been submitted successfully.</p>
+                <p><strong>Claim ID:</strong> {claim.ClaimId}</p>
+                <p><strong>Vehicle No:</strong> {WebUtility.HtmlEncode(vehicleNo)}</p>
+                <p><strong>Status:</strong> {claim.Status}</p>
+                <p>Your claim is now waiting for manual review. We will notify you again when there is an update.</p>
+                """);
+        }
+
+        private async Task NotifyCustomerAsync(ClaimEntity claim, string subject, string htmlBody)
+        {
+            var customer = await _userRepository.GetByIdAsync(claim.UserId);
+            if (customer == null || string.IsNullOrWhiteSpace(customer.Email))
+            {
+                return;
+            }
+
+            await _emailNotificationService.SendAsync(customer.Email, subject, WrapEmail(customer.FullName, htmlBody));
+        }
+
+        private static string BuildClaimStatusEmailBody(
+            ClaimEntity claim,
+            string headline,
+            string? note,
+            string nextStep)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"<p>{headline}</p>");
+            builder.AppendLine($"<p><strong>Claim ID:</strong> {claim.ClaimId}</p>");
+            builder.AppendLine($"<p><strong>Status:</strong> {claim.Status}</p>");
+
+            if (!string.IsNullOrWhiteSpace(note))
+            {
+                builder.AppendLine($"<p><strong>Note:</strong> {note}</p>");
+            }
+
+            builder.AppendLine($"<p>{nextStep}</p>");
+            return builder.ToString();
+        }
+
+        private static string WrapEmail(string customerName, string content)
+        {
+            return $"""
+                <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+                    <p>Hello {WebUtility.HtmlEncode(customerName)},</p>
+                    {content}
+                    <p>Regards,<br />Motor Claim System</p>
+                </div>
+                """;
         }
     }
 }

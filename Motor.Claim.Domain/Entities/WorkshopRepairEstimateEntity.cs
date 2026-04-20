@@ -41,5 +41,7 @@ namespace Motor.Claim.Domain.Entities
 
         [ForeignKey("WorkshopId")]
         public WorkshopEntity Workshop { get; set; } = null!;
+
+        public WorkshopPaymentEntity? Payment { get; set; }
     }
 }

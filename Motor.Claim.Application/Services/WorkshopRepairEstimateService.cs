@@ -11,16 +11,19 @@ namespace Motor.Claim.Application.Services
         private const decimal StpAmountThreshold = 2000m;
         private readonly IWorkshopRepairEstimateRepository _estimateRepository;
         private readonly IClaimRepository _claimRepository;
-        private readonly IWorkshopRepository _workshopRepository;
+        private readonly IWorkshopPaymentRepository _paymentRepository;
+        private readonly WorkshopPaymentService _workshopPaymentService;
 
         public WorkshopRepairEstimateService(
             IWorkshopRepairEstimateRepository estimateRepository,
             IClaimRepository claimRepository,
-            IWorkshopRepository workshopRepository)
+            IWorkshopPaymentRepository paymentRepository,
+            WorkshopPaymentService workshopPaymentService)
         {
             _estimateRepository = estimateRepository;
             _claimRepository = claimRepository;
-            _workshopRepository = workshopRepository;
+            _paymentRepository = paymentRepository;
+            _workshopPaymentService = workshopPaymentService;
         }
 
         public async Task<WorkshopRepairEstimateEntity> SubmitAsync(Guid userId, Guid workshopId, SubmitWorkshopRepairEstimateRequest request)
@@ -80,6 +83,12 @@ namespace Motor.Claim.Application.Services
                     throw new ArgumentException("This claim already has an estimate from another workshop.");
                 }
 
+                var existingPayment = await _paymentRepository.GetByEstimateIdAsync(existing.EstimateId);
+                if (existingPayment != null)
+                {
+                    throw new ArgumentException("This repair estimate already has a payment recorded and cannot be resubmitted.");
+                }
+
                 ApplySubmission(existing, request);
                 existing.SubmittedByUserId = userId;
                 existing.SubmittedAt = DateTime.UtcNow;
@@ -87,7 +96,15 @@ namespace Motor.Claim.Application.Services
                 await _estimateRepository.UpdateAsync(existing);
             }
 
-            return (await _estimateRepository.GetByIdWithDetailsAsync(existing.EstimateId))!;
+            var savedEstimate = (await _estimateRepository.GetByIdWithDetailsAsync(existing.EstimateId))!;
+
+            if (savedEstimate.IsStpApproved || string.Equals(savedEstimate.Status, "StpApproved", StringComparison.OrdinalIgnoreCase))
+            {
+                await _workshopPaymentService.EnsurePaymentForApprovedEstimateAsync(savedEstimate);
+                savedEstimate = (await _estimateRepository.GetByIdWithDetailsAsync(savedEstimate.EstimateId))!;
+            }
+
+            return savedEstimate;
         }
 
         public async Task<List<WorkshopRepairEstimateEntity>> GetAllAsync()
@@ -110,6 +127,7 @@ namespace Motor.Claim.Application.Services
             estimate.ReviewedByUserId = officerUserId;
             estimate.ReviewedAt = DateTime.UtcNow;
             await _estimateRepository.UpdateAsync(estimate);
+            await _workshopPaymentService.EnsurePaymentForApprovedEstimateAsync(estimate);
             return estimate;
         }
 

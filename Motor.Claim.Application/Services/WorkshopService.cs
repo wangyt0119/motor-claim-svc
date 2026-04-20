@@ -3,6 +3,8 @@ using Motor.Claim.Application.Features.Workshop.Commands;
 using Motor.Claim.Application.Interfaces;
 using Motor.Claim.Domain.Entities;
 using Motor.Claim.Domain.Enums;
+using System.Net;
+using System.Text;
 using System.Text.Json;
 
 namespace Motor.Claim.Application.Services
@@ -12,15 +14,21 @@ namespace Motor.Claim.Application.Services
         private readonly IWorkshopRepository _workshopRepository;
         private readonly IWorkshopAppointmentRepository _workshopAppointmentRepository;
         private readonly IClaimRepository _claimRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly IEmailNotificationService _emailNotificationService;
         
         public WorkshopService(
             IWorkshopRepository workshopRepository,
             IWorkshopAppointmentRepository workshopAppointmentRepository,
-            IClaimRepository claimRepository)
+            IClaimRepository claimRepository,
+            IUserRepository userRepository,
+            IEmailNotificationService emailNotificationService)
         {
             _workshopRepository = workshopRepository;
             _workshopAppointmentRepository = workshopAppointmentRepository;
             _claimRepository = claimRepository;
+            _userRepository = userRepository;
+            _emailNotificationService = emailNotificationService;
         }
 
         public async Task<List<string>> GetPanelStatesAsync()
@@ -183,6 +191,7 @@ namespace Motor.Claim.Application.Services
             var savedAppointment = await _workshopAppointmentRepository.GetByClaimIdAsync(request.ClaimId)
                 ?? throw new InvalidOperationException("Workshop appointment could not be loaded after save.");
 
+            await SendWorkshopAppointmentNotificationsAsync(claim, workshop, savedAppointment);
             return MapAppointmentResponse(savedAppointment);
         }
 
@@ -252,6 +261,11 @@ namespace Motor.Claim.Application.Services
                 BankName = workshop.BankName,
                 BankAccountNumber = workshop.BankAccountNumber,
                 BankAccountHolderName = workshop.BankAccountHolderName,
+                StripeConnectedAccountId = workshop.StripeConnectedAccountId,
+                StripeOnboardingStatus = workshop.StripeOnboardingStatus,
+                StripeChargesEnabled = workshop.StripeChargesEnabled,
+                StripePayoutsEnabled = workshop.StripePayoutsEnabled,
+                StripeLastSyncedAt = workshop.StripeLastSyncedAt,
                 IsPanelWorkshop = workshop.IsPanelWorkshop,
                 IsActive = workshop.IsActive
             };
@@ -324,6 +338,81 @@ namespace Motor.Claim.Application.Services
             {
                 return new List<string> { payload.Trim() };
             }
+        }
+
+        private async Task SendWorkshopAppointmentNotificationsAsync(
+            ClaimEntity claim,
+            WorkshopEntity workshop,
+            WorkshopAppointmentEntity appointment)
+        {
+            var customer = await _userRepository.GetByIdAsync(claim.UserId);
+            if (customer != null && !string.IsNullOrWhiteSpace(customer.Email))
+            {
+                await _emailNotificationService.SendAsync(
+                    customer.Email,
+                    "Your panel workshop has been selected",
+                    WrapEmail(
+                        customer.FullName,
+                        BuildWorkshopAppointmentEmailBody(claim, workshop, appointment, false)));
+            }
+
+            foreach (var workshopEmail in DeserializeOptionalList(workshop.Email).Where(IsValidEmail))
+            {
+                await _emailNotificationService.SendAsync(
+                    workshopEmail,
+                    "A new claim has selected your workshop",
+                    WrapEmail(
+                        workshop.Name,
+                        BuildWorkshopAppointmentEmailBody(claim, workshop, appointment, true)));
+            }
+        }
+
+        private static string BuildWorkshopAppointmentEmailBody(
+            ClaimEntity claim,
+            WorkshopEntity workshop,
+            WorkshopAppointmentEntity appointment,
+            bool forWorkshop)
+        {
+            var builder = new StringBuilder();
+
+            if (forWorkshop)
+            {
+                builder.AppendLine("<p>A customer has selected your panel workshop for an approved motor claim.</p>");
+            }
+            else
+            {
+                builder.AppendLine("<p>Your panel workshop selection has been recorded successfully.</p>");
+            }
+
+            builder.AppendLine($"<p><strong>Claim ID:</strong> {claim.ClaimId}</p>");
+            builder.AppendLine($"<p><strong>Workshop:</strong> {WebUtility.HtmlEncode(workshop.Name)}</p>");
+            builder.AppendLine($"<p><strong>State:</strong> {WebUtility.HtmlEncode(workshop.State)}</p>");
+            builder.AppendLine($"<p><strong>Address:</strong> {WebUtility.HtmlEncode(workshop.Address)}</p>");
+            builder.AppendLine($"<p><strong>Preferred Date:</strong> {appointment.PreferredDate:dd MMM yyyy}</p>");
+            builder.AppendLine($"<p><strong>Time Slot:</strong> {appointment.TimeSlotStart:hh\\:mm} - {appointment.TimeSlotEnd:hh\\:mm}</p>");
+
+            if (!string.IsNullOrWhiteSpace(appointment.Notes))
+            {
+                builder.AppendLine($"<p><strong>Notes:</strong> {WebUtility.HtmlEncode(appointment.Notes)}</p>");
+            }
+
+            return builder.ToString();
+        }
+
+        private static string WrapEmail(string recipientName, string content)
+        {
+            return $"""
+                <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+                    <p>Hello {WebUtility.HtmlEncode(recipientName)},</p>
+                    {content}
+                    <p>Regards,<br />Motor Claim System</p>
+                </div>
+                """;
+        }
+
+        private static bool IsValidEmail(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) && value.Contains('@');
         }
     }
 }

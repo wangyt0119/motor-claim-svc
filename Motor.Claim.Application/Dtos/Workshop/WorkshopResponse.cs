@@ -12,6 +12,11 @@ namespace Motor.Claim.Application.Dtos.Workshop
         public string? BankName { get; set; }
         public string? BankAccountNumber { get; set; }
         public string? BankAccountHolderName { get; set; }
+        public string? StripeConnectedAccountId { get; set; }
+        public string? StripeOnboardingStatus { get; set; }
+        public bool StripeChargesEnabled { get; set; }
+        public bool StripePayoutsEnabled { get; set; }
+        public DateTime? StripeLastSyncedAt { get; set; }
         public bool IsPanelWorkshop { get; set; }
         public bool IsActive { get; set; }
     }

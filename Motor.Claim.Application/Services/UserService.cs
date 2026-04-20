@@ -192,6 +192,11 @@ namespace Motor.Claim.Application.Services
                         BankName = workshop.BankName,
                         BankAccountNumber = workshop.BankAccountNumber,
                         BankAccountHolderName = workshop.BankAccountHolderName,
+                        StripeConnectedAccountId = workshop.StripeConnectedAccountId,
+                        StripeOnboardingStatus = workshop.StripeOnboardingStatus,
+                        StripeChargesEnabled = workshop.StripeChargesEnabled,
+                        StripePayoutsEnabled = workshop.StripePayoutsEnabled,
+                        StripeLastSyncedAt = workshop.StripeLastSyncedAt,
                         IsPanelWorkshop = workshop.IsPanelWorkshop,
                         IsActive = workshop.IsActive
                     }

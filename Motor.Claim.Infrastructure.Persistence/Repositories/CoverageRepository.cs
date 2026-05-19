@@ -21,6 +21,9 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                 .Include(x => x.Claims)
                     .ThenInclude(x => x.WorkshopRepairEstimate)
                         .ThenInclude(x => x.Workshop)
+                .Include(x => x.Claims)
+                    .ThenInclude(x => x.WorkshopPayment)
+                        .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }
 
@@ -32,6 +35,9 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                         .ThenInclude(x => x.Workshop)
                 .Include(x => x.Claims)
                     .ThenInclude(x => x.WorkshopRepairEstimate)
+                        .ThenInclude(x => x.Workshop)
+                .Include(x => x.Claims)
+                    .ThenInclude(x => x.WorkshopPayment)
                         .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }

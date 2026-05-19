@@ -16,6 +16,7 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
             return await _context.Set<WorkshopRepairEstimateEntity>()
                 .Include(x => x.Workshop)
                 .Include(x => x.Claim)
+                    .ThenInclude(x => x.Coverage)
                 .FirstOrDefaultAsync(x => x.ClaimId == claimId);
         }
 
@@ -24,6 +25,7 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
             return await _context.Set<WorkshopRepairEstimateEntity>()
                 .Include(x => x.Workshop)
                 .Include(x => x.Claim)
+                    .ThenInclude(x => x.Coverage)
                 .FirstOrDefaultAsync(x => x.EstimateId == estimateId);
         }
 
@@ -32,6 +34,7 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
             return await _context.Set<WorkshopRepairEstimateEntity>()
                 .Include(x => x.Workshop)
                 .Include(x => x.Claim)
+                    .ThenInclude(x => x.Coverage)
                 .OrderByDescending(x => x.SubmittedAt)
                 .ToListAsync();
         }
@@ -41,6 +44,7 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
             return await _context.Set<WorkshopRepairEstimateEntity>()
                 .Include(x => x.Workshop)
                 .Include(x => x.Claim)
+                    .ThenInclude(x => x.Coverage)
                 .Where(x => x.WorkshopId == workshopId)
                 .OrderByDescending(x => x.SubmittedAt)
                 .ToListAsync();

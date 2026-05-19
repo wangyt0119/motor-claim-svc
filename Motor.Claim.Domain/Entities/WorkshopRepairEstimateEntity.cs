@@ -19,6 +19,9 @@ namespace Motor.Claim.Domain.Entities
 
         [Required]
         public decimal TotalAmount { get; set; }
+        public decimal InsurancePayableAmount { get; set; }
+        public decimal CustomerPayableAmount { get; set; }
+        public bool IsPartialCoverage { get; set; }
         public string? ReceiptOrQuotationDocument { get; set; }
         public string? SupportingDocuments { get; set; }
         public string? Remarks { get; set; }

@@ -22,5 +22,7 @@ namespace Motor.Claim.Application.Dtos.Coverage
         [Required]
         public DateTime ExpiryDate { get; set; }
 
+        public decimal? CoverageLimitAmount { get; set; }
+
     }
 }

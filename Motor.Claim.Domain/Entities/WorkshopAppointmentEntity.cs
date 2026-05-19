@@ -30,6 +30,12 @@ namespace Motor.Claim.Domain.Entities
 
         public string? Notes { get; set; }
 
+        [NotMapped]
+        public bool? EmailNotificationSent { get; set; }
+
+        [NotMapped]
+        public string? EmailNotificationMessage { get; set; }
+
         [ForeignKey("ClaimId")]
         public ClaimEntity Claim { get; set; } = null!;
 

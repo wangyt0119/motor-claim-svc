@@ -187,7 +187,11 @@ namespace Motor.Claim.API.Controllers
                 ReviewStatus = claim.ReviewStatus,
                 STPStatus = claim.STPStatus,
                 IsSTPApproved = claim.IsSTPApproved,
+                IsFlaggedForManualReview = claim.IsFlaggedForManualReview,
+                ManualReviewFlagReason = claim.ManualReviewFlagReason,
                 ValidationResult = claim.ValidationResult,
+                EmailNotificationSent = claim.EmailNotificationSent,
+                EmailNotificationMessage = claim.EmailNotificationMessage,
                 OfficerDecisionNote = claim.OfficerDecisionNote,
                 RequestedItems = claim.RequestedItems,
                 CustomerResponseNote = claim.CustomerResponseNote,
@@ -197,7 +201,8 @@ namespace Motor.Claim.API.Controllers
                 DecidedAt = claim.DecidedAt,
                 ReviewedByUserId = claim.ReviewedByUserId,
                 WorkshopAppointment = MapWorkshopAppointment(claim.WorkshopAppointment),
-                WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate)
+                WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate),
+                WorkshopPayment = claim.WorkshopPayment == null ? null : WorkshopPaymentService.MapResponse(claim.WorkshopPayment)
             };
         }
 

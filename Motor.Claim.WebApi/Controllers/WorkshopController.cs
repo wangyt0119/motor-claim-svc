@@ -362,6 +362,26 @@ namespace Motor.Claim.API.Controllers
             return payment == null ? NotFound() : Ok(WorkshopPaymentService.MapResponse(payment));
         }
 
+        [HttpGet("repair-estimates/{estimateId:guid}/payment/customer")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> GetMyPaymentByEstimate(Guid estimateId, [FromServices] WorkshopPaymentService workshopPaymentService)
+        {
+            var userId = GetCurrentUserId();
+            var payment = await workshopPaymentService.GetByEstimateIdAsync(estimateId);
+
+            if (payment == null)
+            {
+                return NotFound();
+            }
+
+            if (payment.Claim.UserId != userId)
+            {
+                return Forbid();
+            }
+
+            return Ok(WorkshopPaymentService.MapResponse(payment));
+        }
+
         [HttpPost("me/stripe/account")]
         [Authorize(Policy = "PanelWorkshopOnly")]
         public async Task<IActionResult> CreateMyStripeConnectedAccount([FromServices] StripeConnectService stripeConnectService)

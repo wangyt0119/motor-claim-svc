@@ -62,8 +62,14 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsFlaggedForManualReview")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSTPApproved")
                         .HasColumnType("bit");
+
+                    b.Property<string>("ManualReviewFlagReason")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("MotorClaimType")
                         .HasColumnType("int");
@@ -144,6 +150,9 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("CoverageLimitAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -156,6 +165,12 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<string>("InsuredPersonName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("RemainingCoverageAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UsedClaimAmount")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -213,6 +228,13 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<int>("Role")
                         .HasColumnType("int");
@@ -408,6 +430,15 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("ClaimId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("CustomerPayableAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("InsurancePayableAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsPartialCoverage")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsStpApproved")
                         .HasColumnType("bit");

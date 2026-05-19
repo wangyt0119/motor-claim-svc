@@ -6,7 +6,9 @@ using Motor.Claim.Application.Interfaces;
 using Motor.Claim.Domain.Entities;
 using Motor.Claim.Domain.Enums;
 using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Motor.Claim.Application.Services
@@ -15,16 +17,19 @@ namespace Motor.Claim.Application.Services
     {
         private readonly IUserRepository _userRepository;
         private readonly IWorkshopRepository _workshopRepository;
+        private readonly IEmailNotificationService _emailNotificationService;
         private readonly PasswordHasher<UserEntity> _passwordHasher;
         private readonly IConfiguration _configuration;
 
         public UserService(
             IUserRepository userRepository,
             IWorkshopRepository workshopRepository,
+            IEmailNotificationService emailNotificationService,
             IConfiguration configuration)
         {
             _userRepository = userRepository;
             _workshopRepository = workshopRepository;
+            _emailNotificationService = emailNotificationService;
             _configuration = configuration;
             _passwordHasher = new PasswordHasher<UserEntity>();
         }
@@ -150,6 +155,70 @@ namespace Motor.Claim.Application.Services
                 WorkshopId = user.WorkshopId,
                 WorkshopName = workshopName
             };
+        }
+
+        public async Task RequestPasswordResetAsync(ForgotPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return;
+            }
+
+            var user = await _userRepository.GetByEmailAsync(request.Email.Trim());
+            if (user == null)
+            {
+                return;
+            }
+
+            var token = GenerateSecureToken();
+            user.PasswordResetTokenHash = HashToken(token);
+            user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddHours(1);
+            await _userRepository.UpdateAsync(user);
+
+            var resetLink = BuildResetPasswordLink(token);
+            var htmlBody = BuildPasswordResetEmailBody(user.FullName, resetLink);
+
+            await _emailNotificationService.SendAsync(
+                user.Email,
+                "Reset your Motor Claim password",
+                htmlBody);
+        }
+
+        public async Task<bool> ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Token)
+                || string.IsNullOrWhiteSpace(request.NewPassword)
+                || string.IsNullOrWhiteSpace(request.ConfirmPassword))
+            {
+                return false;
+            }
+
+            if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Passwords do not match.");
+            }
+
+            if (request.NewPassword.Length < 6)
+            {
+                throw new ArgumentException("Password must be at least 6 characters.");
+            }
+
+            var tokenHash = HashToken(request.Token.Trim());
+            var user = await _userRepository.GetByPasswordResetTokenHashAsync(tokenHash);
+
+            if (user == null
+                || user.PasswordResetTokenExpiresAt == null
+                || user.PasswordResetTokenExpiresAt <= DateTime.UtcNow)
+            {
+                return false;
+            }
+
+            user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+            user.PasswordResetTokenHash = null;
+            user.PasswordResetTokenExpiresAt = null;
+            await _userRepository.UpdateAsync(user);
+
+            return true;
         }
 
         public async Task<UserProfileResponse?> GetProfileAsync(Guid userId)
@@ -305,6 +374,51 @@ namespace Motor.Claim.Application.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private static string GenerateSecureToken()
+        {
+            var bytes = RandomNumberGenerator.GetBytes(32);
+            return Convert.ToBase64String(bytes)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+        }
+
+        private static string HashToken(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes);
+        }
+
+        private string BuildResetPasswordLink(string token)
+        {
+            var resetPasswordUrl = _configuration["Frontend:ResetPasswordUrl"];
+            if (string.IsNullOrWhiteSpace(resetPasswordUrl))
+            {
+                resetPasswordUrl = "http://localhost:3000/reset-password";
+            }
+
+            var separator = resetPasswordUrl.Contains('?') ? "&" : "?";
+            return $"{resetPasswordUrl}{separator}token={WebUtility.UrlEncode(token)}";
+        }
+
+        private static string BuildPasswordResetEmailBody(string fullName, string resetLink)
+        {
+            var safeName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(fullName) ? "there" : fullName.Trim());
+            var safeLink = WebUtility.HtmlEncode(resetLink);
+
+            return $@"
+<div style=""font-family: Arial, sans-serif; color: #222; line-height: 1.5;"">
+  <p>Hi {safeName},</p>
+  <p>We received a request to reset your Motor Claim password.</p>
+  <p>
+    <a href=""{safeLink}"" style=""display: inline-block; padding: 10px 16px; background: #0f5fff; color: #fff; text-decoration: none; border-radius: 4px;"">
+      Reset password
+    </a>
+  </p>
+  <p>This link expires in 1 hour. If you did not request this, you can ignore this email.</p>
+</div>";
         }
 
         private static List<string> DeserializeOptionalList(string? payload)

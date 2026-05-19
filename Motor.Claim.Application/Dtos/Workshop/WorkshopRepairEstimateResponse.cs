@@ -8,6 +8,9 @@ namespace Motor.Claim.Application.Dtos.Workshop
         public string WorkshopName { get; set; } = string.Empty;
         public Guid SubmittedByUserId { get; set; }
         public decimal TotalAmount { get; set; }
+        public decimal InsurancePayableAmount { get; set; }
+        public decimal CustomerPayableAmount { get; set; }
+        public bool IsPartialCoverage { get; set; }
         public string? ReceiptOrQuotationDocument { get; set; }
         public List<string> SupportingDocuments { get; set; } = new();
         public string? Remarks { get; set; }

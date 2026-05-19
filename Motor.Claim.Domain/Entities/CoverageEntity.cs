@@ -31,6 +31,15 @@ namespace Motor.Claim.Domain.Entities
         [Required]
         public DateTime ExpiryDate { get; set; }
 
+        [Required]
+        public decimal CoverageLimitAmount { get; set; }
+
+        [Required]
+        public decimal UsedClaimAmount { get; set; }
+
+        [Required]
+        public decimal RemainingCoverageAmount { get; set; }
+
         [ForeignKey("UserId")]
         public UserEntity User { get; set; }
 

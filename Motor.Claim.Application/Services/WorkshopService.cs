@@ -286,6 +286,8 @@ namespace Motor.Claim.Application.Services
                 TimeSlotEnd = appointment.TimeSlotEnd,
                 Status = appointment.Status,
                 Notes = appointment.Notes,
+                EmailNotificationSent = appointment.EmailNotificationSent,
+                EmailNotificationMessage = appointment.EmailNotificationMessage,
                 CreatedAt = appointment.CreatedAt
             };
         }
@@ -345,26 +347,50 @@ namespace Motor.Claim.Application.Services
             WorkshopEntity workshop,
             WorkshopAppointmentEntity appointment)
         {
+            var notificationMessages = new List<string>();
+            var allSucceeded = true;
+
             var customer = await _userRepository.GetByIdAsync(claim.UserId);
             if (customer != null && !string.IsNullOrWhiteSpace(customer.Email))
             {
-                await _emailNotificationService.SendAsync(
+                var customerResult = await _emailNotificationService.SendDiagnosticAsync(
                     customer.Email,
                     "Your panel workshop has been selected",
                     WrapEmail(
                         customer.FullName,
                         BuildWorkshopAppointmentEmailBody(claim, workshop, appointment, false)));
+
+                allSucceeded &= customerResult.Success;
+                notificationMessages.Add($"Customer email: {customerResult.Message}");
+            }
+            else
+            {
+                allSucceeded = false;
+                notificationMessages.Add("Customer email: Customer email address was not found.");
             }
 
-            foreach (var workshopEmail in DeserializeOptionalList(workshop.Email).Where(IsValidEmail))
+            var workshopEmails = DeserializeOptionalList(workshop.Email).Where(IsValidEmail).ToList();
+            if (workshopEmails.Count == 0)
             {
-                await _emailNotificationService.SendAsync(
+                allSucceeded = false;
+                notificationMessages.Add("Workshop email: Workshop email address was not found.");
+            }
+
+            foreach (var workshopEmail in workshopEmails)
+            {
+                var workshopResult = await _emailNotificationService.SendDiagnosticAsync(
                     workshopEmail,
                     "A new claim has selected your workshop",
                     WrapEmail(
                         workshop.Name,
                         BuildWorkshopAppointmentEmailBody(claim, workshop, appointment, true)));
+
+                allSucceeded &= workshopResult.Success;
+                notificationMessages.Add($"Workshop email ({workshopEmail}): {workshopResult.Message}");
             }
+
+            appointment.EmailNotificationSent = allSucceeded;
+            appointment.EmailNotificationMessage = string.Join(" | ", notificationMessages);
         }
 
         private static string BuildWorkshopAppointmentEmailBody(

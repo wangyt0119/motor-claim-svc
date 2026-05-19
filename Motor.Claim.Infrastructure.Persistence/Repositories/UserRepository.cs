@@ -15,5 +15,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
         {
             return await _context.Users.FirstOrDefaultAsync(x => x.Email == email);
         }
+
+        public async Task<UserEntity?> GetByPasswordResetTokenHashAsync(string tokenHash)
+        {
+            return await _context.Users.FirstOrDefaultAsync(x => x.PasswordResetTokenHash == tokenHash);
+        }
     }
 }

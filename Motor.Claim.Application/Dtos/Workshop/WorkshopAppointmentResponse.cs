@@ -13,6 +13,8 @@ namespace Motor.Claim.Application.Dtos.Workshop
         public TimeSpan TimeSlotEnd { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? Notes { get; set; }
+        public bool? EmailNotificationSent { get; set; }
+        public string? EmailNotificationMessage { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

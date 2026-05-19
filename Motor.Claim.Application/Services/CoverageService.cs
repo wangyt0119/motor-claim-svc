@@ -6,6 +6,7 @@ namespace Motor.Claim.Application.Services
 {
     public class CoverageService
     {
+        private const decimal DefaultCoverageLimitAmount = 50000m;
         private readonly ICoverageRepository _coverageRepository;
 
         public CoverageService(ICoverageRepository coverageRepository)
@@ -20,6 +21,13 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Expiry date cannot be earlier than effective date.");
             }
 
+            if (command.CoverageLimitAmount is < 0)
+            {
+                throw new ArgumentException("Coverage limit amount cannot be negative.");
+            }
+
+            var coverageLimitAmount = command.CoverageLimitAmount ?? DefaultCoverageLimitAmount;
+
             var coverage = new CoverageEntity
             {
                 CreatedAt = DateTime.Now,
@@ -30,7 +38,10 @@ namespace Motor.Claim.Application.Services
                 CoverageType = command.CoverageType,
                 AuthorizedDriver = command.AuthorizedDriver,
                 EffectiveDate = command.EffectiveDate,
-                ExpiryDate = command.ExpiryDate
+                ExpiryDate = command.ExpiryDate,
+                CoverageLimitAmount = coverageLimitAmount,
+                UsedClaimAmount = 0m,
+                RemainingCoverageAmount = coverageLimitAmount
             };
 
             return await _coverageRepository.AddAsync(coverage);

@@ -33,7 +33,11 @@ namespace Motor.Claim.Application.Dtos.Claim
         public string ReviewStatus { get; set; } = string.Empty;
         public StpStatus STPStatus { get; set; }
         public bool IsSTPApproved { get; set; }
+        public bool IsFlaggedForManualReview { get; set; }
+        public string? ManualReviewFlagReason { get; set; }
         public string? ValidationResult { get; set; }
+        public bool? EmailNotificationSent { get; set; }
+        public string? EmailNotificationMessage { get; set; }
         public string? OfficerDecisionNote { get; set; }
         public string? RequestedItems { get; set; }
         public string? CustomerResponseNote { get; set; }
@@ -44,5 +48,6 @@ namespace Motor.Claim.Application.Dtos.Claim
         public Guid? ReviewedByUserId { get; set; }
         public WorkshopAppointmentResponse? WorkshopAppointment { get; set; }
         public WorkshopRepairEstimateResponse? WorkshopRepairEstimate { get; set; }
+        public WorkshopPaymentResponse? WorkshopPayment { get; set; }
     }
 }

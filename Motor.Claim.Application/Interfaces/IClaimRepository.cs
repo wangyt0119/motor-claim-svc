@@ -8,5 +8,6 @@ namespace Motor.Claim.Application.Interfaces
         Task<List<ClaimEntity>> GetByUserIdAsync(Guid userId);
         Task<List<ClaimEntity>> GetApprovedClaimsByWorkshopIdAsync(Guid workshopId);
         Task<ClaimEntity?> GetByIdWithDetailsAsync(Guid claimId);
+        Task<bool> HasSubmittedClaimForCoverageSinceAsync(Guid coverageId, DateTime submittedSinceUtc);
     }
 }

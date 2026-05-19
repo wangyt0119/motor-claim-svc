@@ -48,7 +48,7 @@ namespace Motor.Claim.WebApi.Services
                 var transferService = new TransferService();
                 var transfer = await transferService.CreateAsync(new TransferCreateOptions
                 {
-                    Amount = ConvertAmountToStripeMinorUnit(estimate.TotalAmount),
+                    Amount = ConvertAmountToStripeMinorUnit(estimate.InsurancePayableAmount),
                     Currency = "myr",
                     Destination = workshop.StripeConnectedAccountId.Trim(),
                     Description = $"Workshop payment for claim {estimate.ClaimId}",

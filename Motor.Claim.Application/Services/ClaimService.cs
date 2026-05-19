@@ -10,6 +10,7 @@ namespace Motor.Claim.Application.Services
 {
     public class ClaimService
     {
+        private const int RepeatClaimManualReviewWindowDays = 30;
         private readonly IClaimRepository _claimRepository;
         private readonly ICoverageRepository _coverageRepository;
         private readonly StpValidationService _stpValidationService;
@@ -51,6 +52,11 @@ namespace Motor.Claim.Application.Services
 
             ValidateDocuments(command);
 
+            var manualReviewWindowStart = DateTime.UtcNow.AddDays(-RepeatClaimManualReviewWindowDays);
+            var hasRecentClaimForCoverage = await _claimRepository.HasSubmittedClaimForCoverageSinceAsync(
+                command.CoverageId,
+                manualReviewWindowStart);
+
             var claim = new ClaimEntity
             {
                 CreatedAt = DateTime.UtcNow,
@@ -71,6 +77,10 @@ namespace Motor.Claim.Application.Services
                 VehicleDamageFrontRightDocument = command.VehicleDamageFrontRightDocument,
                 VehicleDamageRearLeftDocument = command.VehicleDamageRearLeftDocument,
                 VehicleDamageRearRightDocument = command.VehicleDamageRearRightDocument,
+                IsFlaggedForManualReview = hasRecentClaimForCoverage,
+                ManualReviewFlagReason = hasRecentClaimForCoverage
+                    ? $"This coverage already has another submitted claim within the last {RepeatClaimManualReviewWindowDays} days."
+                    : null,
                 Status = "Pending",
                 ReviewStatus = "Pending"
             };
@@ -82,9 +92,21 @@ namespace Motor.Claim.Application.Services
             savedClaim.STPStatus = stpResult.STPStatus;
             savedClaim.IsSTPApproved = stpResult.IsApproved;
             savedClaim.ValidationResult = StpValidationService.SerializeResult(stpResult);
-            savedClaim.Status = stpResult.IsApproved ? "Approved" : "Pending Manual Review";
-            savedClaim.ReviewStatus = stpResult.IsApproved ? "Approved" : "PendingManualReview";
-            savedClaim.DecidedAt = stpResult.IsApproved ? DateTime.UtcNow : null;
+
+            if (hasRecentClaimForCoverage)
+            {
+                savedClaim.STPStatus = StpStatus.ManualReview;
+                savedClaim.IsSTPApproved = false;
+                savedClaim.Status = "Pending Manual Review";
+                savedClaim.ReviewStatus = "PendingManualReview";
+                savedClaim.DecidedAt = null;
+            }
+            else
+            {
+                savedClaim.Status = stpResult.IsApproved ? "Approved" : "Pending Manual Review";
+                savedClaim.ReviewStatus = stpResult.IsApproved ? "Approved" : "PendingManualReview";
+                savedClaim.DecidedAt = stpResult.IsApproved ? DateTime.UtcNow : null;
+            }
 
             await _claimRepository.UpdateAsync(savedClaim);
             await SendClaimCreatedNotificationAsync(savedClaim, coverage.VehicleNo);
@@ -249,6 +271,19 @@ namespace Motor.Claim.Application.Services
 
         private async Task SendClaimCreatedNotificationAsync(ClaimEntity claim, string vehicleNo)
         {
+            if (claim.IsFlaggedForManualReview)
+            {
+                await NotifyCustomerAsync(
+                    claim,
+                    "Your motor claim was submitted for manual review",
+                    BuildClaimStatusEmailBody(
+                        claim,
+                        "Your claim has been submitted successfully, but it has been flagged for manual review.",
+                        claim.ManualReviewFlagReason,
+                        "An officer will review this claim before any approval decision is made."));
+                return;
+            }
+
             if (claim.IsSTPApproved || claim.STPStatus == StpStatus.AutoApproved)
             {
                 await NotifyCustomerAsync(
@@ -279,10 +314,18 @@ namespace Motor.Claim.Application.Services
             var customer = await _userRepository.GetByIdAsync(claim.UserId);
             if (customer == null || string.IsNullOrWhiteSpace(customer.Email))
             {
+                claim.EmailNotificationSent = false;
+                claim.EmailNotificationMessage = "Customer email address was not found.";
                 return;
             }
 
-            await _emailNotificationService.SendAsync(customer.Email, subject, WrapEmail(customer.FullName, htmlBody));
+            var result = await _emailNotificationService.SendDiagnosticAsync(
+                customer.Email,
+                subject,
+                WrapEmail(customer.FullName, htmlBody));
+
+            claim.EmailNotificationSent = result.Success;
+            claim.EmailNotificationMessage = result.Message;
         }
 
         private static string BuildClaimStatusEmailBody(

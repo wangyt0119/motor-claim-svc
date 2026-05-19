@@ -43,7 +43,8 @@ namespace Motor.Claim.API.Controllers
                     CoverageType = request.CoverageType,
                     AuthorizedDriver = request.AuthorizedDriver,
                     EffectiveDate = request.EffectiveDate,
-                    ExpiryDate = request.ExpiryDate
+                    ExpiryDate = request.ExpiryDate,
+                    CoverageLimitAmount = request.CoverageLimitAmount
                 };
 
                 var result = await _createCoverageCommandHandler.Handle(command);
@@ -92,6 +93,9 @@ namespace Motor.Claim.API.Controllers
                 AuthorizedDriver = coverage.AuthorizedDriver,
                 EffectiveDate = coverage.EffectiveDate,
                 ExpiryDate = coverage.ExpiryDate,
+                CoverageLimitAmount = coverage.CoverageLimitAmount,
+                UsedClaimAmount = coverage.UsedClaimAmount,
+                RemainingCoverageAmount = coverage.RemainingCoverageAmount,
                 Claims = coverage.Claims.Select(claim => new ClaimResponse
                 {
                     ClaimId = claim.ClaimId,
@@ -116,7 +120,11 @@ namespace Motor.Claim.API.Controllers
                     ReviewStatus = claim.ReviewStatus,
                     STPStatus = claim.STPStatus,
                     IsSTPApproved = claim.IsSTPApproved,
+                    IsFlaggedForManualReview = claim.IsFlaggedForManualReview,
+                    ManualReviewFlagReason = claim.ManualReviewFlagReason,
                     ValidationResult = claim.ValidationResult,
+                    EmailNotificationSent = claim.EmailNotificationSent,
+                    EmailNotificationMessage = claim.EmailNotificationMessage,
                     OfficerDecisionNote = claim.OfficerDecisionNote,
                     RequestedItems = claim.RequestedItems,
                     CustomerResponseNote = claim.CustomerResponseNote,
@@ -126,7 +134,8 @@ namespace Motor.Claim.API.Controllers
                     DecidedAt = claim.DecidedAt,
                     ReviewedByUserId = claim.ReviewedByUserId,
                     WorkshopAppointment = MapWorkshopAppointment(claim.WorkshopAppointment),
-                    WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate)
+                    WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate),
+                    WorkshopPayment = claim.WorkshopPayment == null ? null : Motor.Claim.Application.Services.WorkshopPaymentService.MapResponse(claim.WorkshopPayment)
                 }).ToList()
             };
         }

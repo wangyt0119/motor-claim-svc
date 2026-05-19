@@ -94,6 +94,40 @@ namespace Motor.Claim.WebApi.Controllers
             return Ok(result);
         }
 
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            await _userService.RequestPasswordResetAsync(request);
+
+            return Ok(new
+            {
+                message = "If the email exists, a password reset link has been sent."
+            });
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                var success = await _userService.ResetPasswordAsync(request);
+
+                if (!success)
+                {
+                    return BadRequest("Invalid or expired reset token.");
+                }
+
+                return Ok(new
+                {
+                    message = "Password has been reset successfully."
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> Me()

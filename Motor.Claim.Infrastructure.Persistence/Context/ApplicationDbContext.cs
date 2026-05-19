@@ -88,6 +88,26 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
                 .Property(x => x.TotalAmount)
                 .HasColumnType("decimal(18,2)");
 
+            modelBuilder.Entity<WorkshopRepairEstimateEntity>()
+                .Property(x => x.InsurancePayableAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<WorkshopRepairEstimateEntity>()
+                .Property(x => x.CustomerPayableAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<CoverageEntity>()
+                .Property(x => x.CoverageLimitAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<CoverageEntity>()
+                .Property(x => x.UsedClaimAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<CoverageEntity>()
+                .Property(x => x.RemainingCoverageAmount)
+                .HasColumnType("decimal(18,2)");
+
             modelBuilder.Entity<WorkshopPaymentEntity>()
                 .HasKey(x => x.PaymentId);
 
@@ -134,6 +154,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
                 .WithMany(x => x.Users)
                 .HasForeignKey(x => x.WorkshopId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserEntity>()
+                .Property(x => x.PasswordResetTokenHash)
+                .HasMaxLength(64);
 
             modelBuilder.Entity<SystemActivityLogEntity>()
                 .Property(x => x.Module)

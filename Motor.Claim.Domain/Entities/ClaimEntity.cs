@@ -43,6 +43,8 @@ namespace Motor.Claim.Domain.Entities
         public string ReviewStatus { get; set; } = "Pending";
         public StpStatus STPStatus { get; set; } = StpStatus.Pending;
         public bool IsSTPApproved { get; set; }
+        public bool IsFlaggedForManualReview { get; set; }
+        public string? ManualReviewFlagReason { get; set; }
         public string? ValidationResult { get; set; }
         public string? OfficerDecisionNote { get; set; }
         public string? RequestedItems { get; set; }
@@ -55,6 +57,12 @@ namespace Motor.Claim.Domain.Entities
         public WorkshopAppointmentEntity? WorkshopAppointment { get; set; }
         public WorkshopRepairEstimateEntity? WorkshopRepairEstimate { get; set; }
         public WorkshopPaymentEntity? WorkshopPayment { get; set; }
+
+        [NotMapped]
+        public bool? EmailNotificationSent { get; set; }
+
+        [NotMapped]
+        public string? EmailNotificationMessage { get; set; }
 
         [ForeignKey("UserId")]
         public UserEntity User { get; set; }

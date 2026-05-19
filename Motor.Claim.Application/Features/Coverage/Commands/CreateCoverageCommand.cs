@@ -15,5 +15,6 @@ namespace Motor.Claim.Application.Features.Coverage.Commands
         public string? AuthorizedDriver { get; set; }
         public DateTime EffectiveDate { get; set; }
         public DateTime ExpiryDate { get; set; }
+        public decimal? CoverageLimitAmount { get; set; }
     }
 }

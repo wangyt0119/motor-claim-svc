@@ -74,6 +74,7 @@ namespace Motor.Claim.Application.Services
                 };
 
                 ApplySubmission(existing, request);
+                ApplyCoverageSplit(existing, claim.Coverage);
                 await _estimateRepository.AddAsync(existing);
             }
             else
@@ -90,6 +91,7 @@ namespace Motor.Claim.Application.Services
                 }
 
                 ApplySubmission(existing, request);
+                ApplyCoverageSplit(existing, claim.Coverage);
                 existing.SubmittedByUserId = userId;
                 existing.SubmittedAt = DateTime.UtcNow;
                 ResetReview(existing);
@@ -126,8 +128,8 @@ namespace Motor.Claim.Application.Services
             estimate.ReviewNote = reviewNote;
             estimate.ReviewedByUserId = officerUserId;
             estimate.ReviewedAt = DateTime.UtcNow;
-            await _estimateRepository.UpdateAsync(estimate);
             await _workshopPaymentService.EnsurePaymentForApprovedEstimateAsync(estimate);
+            await _estimateRepository.UpdateAsync(estimate);
             return estimate;
         }
 
@@ -186,7 +188,7 @@ namespace Motor.Claim.Application.Services
                 estimate.Status = "StpApproved";
                 estimate.ReviewMode = "STP";
                 estimate.IsStpApproved = true;
-                estimate.ReviewNote = $"Auto-approved by STP because total amount is RM {estimate.TotalAmount:0.00}, which is at or below RM {StpAmountThreshold:0.00}.";
+                estimate.ReviewNote = $"Approved - total amount is RM {estimate.TotalAmount:0.00}";
                 estimate.RequestedItems = null;
                 estimate.ReviewedByUserId = null;
                 estimate.ReviewedAt = estimate.SubmittedAt;
@@ -203,6 +205,16 @@ namespace Motor.Claim.Application.Services
             }
         }
 
+        private static void ApplyCoverageSplit(WorkshopRepairEstimateEntity estimate, CoverageEntity coverage)
+        {
+            var remainingCoverageAmount = Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
+            var insurancePayableAmount = Math.Min(estimate.TotalAmount, remainingCoverageAmount);
+
+            estimate.InsurancePayableAmount = insurancePayableAmount;
+            estimate.CustomerPayableAmount = estimate.TotalAmount - insurancePayableAmount;
+            estimate.IsPartialCoverage = estimate.CustomerPayableAmount > 0m;
+        }
+
         public static WorkshopRepairEstimateResponse MapResponse(WorkshopRepairEstimateEntity estimate)
         {
             return new WorkshopRepairEstimateResponse
@@ -213,6 +225,9 @@ namespace Motor.Claim.Application.Services
                 WorkshopName = estimate.Workshop?.Name ?? string.Empty,
                 SubmittedByUserId = estimate.SubmittedByUserId,
                 TotalAmount = estimate.TotalAmount,
+                InsurancePayableAmount = estimate.InsurancePayableAmount,
+                CustomerPayableAmount = estimate.CustomerPayableAmount,
+                IsPartialCoverage = estimate.IsPartialCoverage,
                 ReceiptOrQuotationDocument = estimate.ReceiptOrQuotationDocument,
                 SupportingDocuments = DeserializeList(estimate.SupportingDocuments),
                 Remarks = estimate.Remarks,

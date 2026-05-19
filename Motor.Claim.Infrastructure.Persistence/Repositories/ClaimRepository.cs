@@ -20,6 +20,8 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                     .ThenInclude(x => x.Workshop)
                 .Include(x => x.WorkshopRepairEstimate)
                     .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopPayment)
+                    .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }
 
@@ -32,6 +34,8 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                     .ThenInclude(x => x.Workshop)
                 .Include(x => x.WorkshopRepairEstimate)
                     .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopPayment)
+                    .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }
 
@@ -43,7 +47,16 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                     .ThenInclude(x => x.Workshop)
                 .Include(x => x.WorkshopRepairEstimate)
                     .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopPayment)
+                    .ThenInclude(x => x.Workshop)
                 .FirstOrDefaultAsync(x => x.ClaimId == claimId);
+        }
+
+        public async Task<bool> HasSubmittedClaimForCoverageSinceAsync(Guid coverageId, DateTime submittedSinceUtc)
+        {
+            return await _context.Claims.AnyAsync(x =>
+                x.CoverageId == coverageId &&
+                x.CreatedAt >= submittedSinceUtc);
         }
 
         public async Task<List<ClaimEntity>> GetApprovedClaimsByWorkshopIdAsync(Guid workshopId)
@@ -59,6 +72,8 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                 .Include(x => x.WorkshopAppointment)
                     .ThenInclude(x => x.Workshop)
                 .Include(x => x.WorkshopRepairEstimate)
+                    .ThenInclude(x => x.Workshop)
+                .Include(x => x.WorkshopPayment)
                     .ThenInclude(x => x.Workshop)
                 .ToListAsync();
         }

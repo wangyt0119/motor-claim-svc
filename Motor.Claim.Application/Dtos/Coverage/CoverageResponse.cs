@@ -13,6 +13,9 @@ namespace Motor.Claim.Application.Dtos.Coverage
         public string? AuthorizedDriver { get; set; }
         public DateTime EffectiveDate { get; set; }
         public DateTime ExpiryDate { get; set; }
+        public decimal CoverageLimitAmount { get; set; }
+        public decimal UsedClaimAmount { get; set; }
+        public decimal RemainingCoverageAmount { get; set; }
         public List<ClaimResponse> Claims { get; set; } = new();
     }
 }

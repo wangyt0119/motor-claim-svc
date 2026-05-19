@@ -115,7 +115,9 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000")
+            .WithOrigins(
+            "http://localhost:3000",
+            "https://motor-claim-52avlyl6m-wangyt0119s-projects.vercel.app")
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -127,11 +129,9 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 app.UseHttpsRedirection();
 

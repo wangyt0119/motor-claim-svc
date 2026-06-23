@@ -23,6 +23,18 @@ namespace Motor.Claim.Domain.Entities
         public string VehicleNo { get; set; }
 
         [Required]
+        public string VehicleMake { get; set; }
+
+        [Required]
+        public string VehicleModel { get; set; }
+
+        [Required]
+        public int Year { get; set; }
+
+        [Required]
+        public string ModelType { get; set; }
+
+        [Required]
         public string CoverageType { get; set; }
 
         [Required]
@@ -39,6 +51,15 @@ namespace Motor.Claim.Domain.Entities
 
         [Required]
         public decimal RemainingCoverageAmount { get; set; }
+
+        [Required]
+        public decimal WindscreenCoverageLimitAmount { get; set; }
+
+        [Required]
+        public decimal WindscreenUsedClaimAmount { get; set; }
+
+        [Required]
+        public decimal WindscreenRemainingCoverageAmount { get; set; }
 
         [ForeignKey("UserId")]
         public UserEntity User { get; set; }

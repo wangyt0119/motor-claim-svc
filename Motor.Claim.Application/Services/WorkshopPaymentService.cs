@@ -1,6 +1,7 @@
 using Motor.Claim.Application.Dtos.Workshop;
 using Motor.Claim.Application.Interfaces;
 using Motor.Claim.Domain.Entities;
+using Motor.Claim.Domain.Enums;
 
 namespace Motor.Claim.Application.Services
 {
@@ -71,8 +72,18 @@ namespace Motor.Claim.Application.Services
                 };
             }
 
-            coverage.UsedClaimAmount += estimate.InsurancePayableAmount;
-            coverage.RemainingCoverageAmount = Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
+            if (estimate.Claim.MotorClaimType == MotorClaimType.Windscreen)
+            {
+                coverage.WindscreenUsedClaimAmount += estimate.InsurancePayableAmount;
+                coverage.WindscreenRemainingCoverageAmount = Math.Max(
+                    coverage.WindscreenCoverageLimitAmount - coverage.WindscreenUsedClaimAmount,
+                    0m);
+            }
+            else
+            {
+                coverage.UsedClaimAmount += estimate.InsurancePayableAmount;
+                coverage.RemainingCoverageAmount = Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
+            }
 
             await _estimateRepository.UpdateAsync(estimate);
             await _coverageRepository.UpdateAsync(coverage);
@@ -149,7 +160,10 @@ namespace Motor.Claim.Application.Services
 
         private static void ApplyCoverageSplit(WorkshopRepairEstimateEntity estimate, CoverageEntity coverage)
         {
-            var remainingCoverageAmount = Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
+            var isWindscreenClaim = estimate.Claim?.MotorClaimType == MotorClaimType.Windscreen;
+            var remainingCoverageAmount = isWindscreenClaim
+                ? Math.Max(coverage.WindscreenCoverageLimitAmount - coverage.WindscreenUsedClaimAmount, 0m)
+                : Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
             var insurancePayableAmount = Math.Min(estimate.TotalAmount, remainingCoverageAmount);
 
             estimate.InsurancePayableAmount = insurancePayableAmount;

@@ -263,6 +263,106 @@ namespace Motor.Claim.API.Controllers
             }
         }
 
+        [HttpPost("assignments/already-at-workshop")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> AssignVehicleAlreadyAtWorkshop(
+            [FromServices] WorkshopService workshopService,
+            [FromBody] AssignVehicleAlreadyAtWorkshopRequest request)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await workshopService.AssignVehicleAlreadyAtWorkshopAsync(userId, request);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("panel-workshop/claim-link-requests")]
+        [Authorize(Policy = "PanelWorkshopOnly")]
+        public async Task<IActionResult> CreateClaimLinkRequest(
+            [FromServices] WorkshopClaimLinkRequestService linkRequestService,
+            [FromBody] CreateWorkshopClaimLinkRequest request)
+        {
+            try
+            {
+                var workshopId = GetCurrentWorkshopId();
+                var result = await linkRequestService.CreateAsync(workshopId, request);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("panel-workshop/claim-link-requests")]
+        [Authorize(Policy = "PanelWorkshopOnly")]
+        public async Task<IActionResult> GetMyWorkshopClaimLinkRequests(
+            [FromServices] WorkshopClaimLinkRequestService linkRequestService)
+        {
+            try
+            {
+                var workshopId = GetCurrentWorkshopId();
+                var result = await linkRequestService.GetForWorkshopAsync(workshopId);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("claim-link-requests")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> GetMyClaimLinkRequests(
+            [FromServices] WorkshopClaimLinkRequestService linkRequestService)
+        {
+            var userId = GetCurrentUserId();
+            var result = await linkRequestService.GetForCustomerAsync(userId);
+            return Ok(result);
+        }
+
+        [HttpPost("claim-link-requests/{requestId:guid}/accept")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> AcceptClaimLinkRequest(
+            Guid requestId,
+            [FromServices] WorkshopClaimLinkRequestService linkRequestService)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await linkRequestService.AcceptAsync(userId, requestId);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("claim-link-requests/{requestId:guid}/reject")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> RejectClaimLinkRequest(
+            Guid requestId,
+            [FromServices] WorkshopClaimLinkRequestService linkRequestService,
+            [FromBody] RejectWorkshopClaimLinkRequest request)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await linkRequestService.RejectAsync(userId, requestId, request);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("appointments/claim/{claimId:guid}")]
         [Authorize(Policy = "CustomerOnly")]
         public async Task<IActionResult> GetAppointment(Guid claimId)

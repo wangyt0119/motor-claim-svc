@@ -127,6 +127,13 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<string>("VehicleOwnershipCertificateDocument")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("WithdrawalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("WithdrawnAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("ClaimId");
 
                     b.HasIndex("CoverageId");
@@ -146,12 +153,12 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("CoverageLimitAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("CoverageType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("CoverageLimitAmount")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -166,87 +173,48 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ModelType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal>("RemainingCoverageAmount")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("UsedClaimAmount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("WindscreenCoverageLimitAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("WindscreenRemainingCoverageAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("WindscreenUsedClaimAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VehicleMake")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VehicleModel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("VehicleNo")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
 
                     b.HasKey("CoverageId");
 
                     b.HasIndex("UserId");
 
                     b.ToTable("Coverages");
-                });
-
-            modelBuilder.Entity("Motor.Claim.Domain.Entities.UserEntity", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("IdType")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsMaybankGroupEmployee")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("IssueCountry")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("MobileCountry")
-                        .HasColumnType("int");
-
-                    b.Property<string>("MobileNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("NRIC")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PassportNo")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("PasswordResetTokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("WorkshopId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("UserId");
-
-                    b.HasIndex("WorkshopId");
-
-                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("Motor.Claim.Domain.Entities.SystemActivityLogEntity", b =>
@@ -312,11 +280,86 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.ToTable("SystemActivityLogs");
                 });
 
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.UserEntity", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("IdType")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsMaybankGroupEmployee")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("IssueCountry")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("MobileCountry")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MobileNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NRIC")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PassportNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("WorkshopId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("WorkshopId");
+
+                    b.ToTable("Users");
+                });
+
             modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopAppointmentEntity", b =>
                 {
                     b.Property<Guid>("AppointmentId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AssignmentType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("ScheduledAppointment");
 
                     b.Property<Guid>("ClaimId")
                         .HasColumnType("uniqueidentifier");
@@ -343,6 +386,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("WorkshopId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("WorkshopReferenceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.HasKey("AppointmentId");
 
                     b.HasIndex("ClaimId")
@@ -351,6 +398,53 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.HasIndex("WorkshopId");
 
                     b.ToTable("WorkshopAppointments");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopClaimLinkRequestEntity", b =>
+                {
+                    b.Property<Guid>("RequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ArrivalDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerResponseNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("WorkshopId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("WorkshopReferenceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("RequestId");
+
+                    b.HasIndex("WorkshopId");
+
+                    b.HasIndex("ClaimId", "Status");
+
+                    b.ToTable("WorkshopClaimLinkRequests");
                 });
 
             modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopEntity", b =>
@@ -395,6 +489,11 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<bool>("StripeChargesEnabled")
                         .HasColumnType("bit");
 
@@ -412,14 +511,81 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Property<bool>("StripePayoutsEnabled")
                         .HasColumnType("bit");
 
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.HasKey("WorkshopId");
 
                     b.ToTable("Workshops");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopPaymentEntity", b =>
+                {
+                    b.Property<Guid>("PaymentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ApprovalSource")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("BankAccountHolderNameSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BankAccountNumberSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BankNameSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid>("EstimateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ProviderReference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("WorkshopId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("PaymentId");
+
+                    b.HasIndex("ClaimId")
+                        .IsUnique();
+
+                    b.HasIndex("EstimateId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkshopId");
+
+                    b.ToTable("WorkshopPayments");
                 });
 
             modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", b =>
@@ -494,78 +660,6 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.ToTable("WorkshopRepairEstimates");
                 });
 
-            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopPaymentEntity", b =>
-                {
-                    b.Property<Guid>("PaymentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ApprovalSource")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("BankAccountHolderNameSnapshot")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("BankAccountNumberSnapshot")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("BankNameSnapshot")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("ClaimId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<Guid>("EstimateId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("FailureReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("PaidAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("ProviderReference")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<Guid>("WorkshopId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("PaymentId");
-
-                    b.HasIndex("ClaimId")
-                        .IsUnique();
-
-                    b.HasIndex("EstimateId")
-                        .IsUnique();
-
-                    b.HasIndex("WorkshopId");
-
-                    b.ToTable("WorkshopPayments");
-                });
-
             modelBuilder.Entity("Motor.Claim.Domain.Entities.ClaimEntity", b =>
                 {
                     b.HasOne("Motor.Claim.Domain.Entities.CoverageEntity", "Coverage")
@@ -625,16 +719,16 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Navigation("Workshop");
                 });
 
-            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", b =>
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopClaimLinkRequestEntity", b =>
                 {
                     b.HasOne("Motor.Claim.Domain.Entities.ClaimEntity", "Claim")
-                        .WithOne("WorkshopRepairEstimate")
-                        .HasForeignKey("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", "ClaimId")
+                        .WithMany("WorkshopClaimLinkRequests")
+                        .HasForeignKey("ClaimId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Motor.Claim.Domain.Entities.WorkshopEntity", "Workshop")
-                        .WithMany("RepairEstimates")
+                        .WithMany("ClaimLinkRequests")
                         .HasForeignKey("WorkshopId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -671,9 +765,30 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                     b.Navigation("Workshop");
                 });
 
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", b =>
+                {
+                    b.HasOne("Motor.Claim.Domain.Entities.ClaimEntity", "Claim")
+                        .WithOne("WorkshopRepairEstimate")
+                        .HasForeignKey("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", "ClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Motor.Claim.Domain.Entities.WorkshopEntity", "Workshop")
+                        .WithMany("RepairEstimates")
+                        .HasForeignKey("WorkshopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Claim");
+
+                    b.Navigation("Workshop");
+                });
+
             modelBuilder.Entity("Motor.Claim.Domain.Entities.ClaimEntity", b =>
                 {
                     b.Navigation("WorkshopAppointment");
+
+                    b.Navigation("WorkshopClaimLinkRequests");
 
                     b.Navigation("WorkshopPayment");
 
@@ -696,11 +811,18 @@ namespace Motor.Claim.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Appointments");
 
+                    b.Navigation("ClaimLinkRequests");
+
                     b.Navigation("Payments");
 
                     b.Navigation("RepairEstimates");
 
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("Motor.Claim.Domain.Entities.WorkshopRepairEstimateEntity", b =>
+                {
+                    b.Navigation("Payment");
                 });
 #pragma warning restore 612, 618
         }

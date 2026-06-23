@@ -108,13 +108,15 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                         continue;
                     }
 
+                    var payload = await response.Content.ReadAsStringAsync();
+
                     if (!response.IsSuccessStatusCode)
                     {
                         return new OcrExtractionResult
                         {
                             IsSuccess = false,
                             Confidence = 0m,
-                            ErrorMessage = $"Azure OCR analyze request failed with status {(int)response.StatusCode}."
+                            ErrorMessage = BuildAzureErrorMessage("analyze", response, payload)
                         };
                     }
 
@@ -183,7 +185,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                     {
                         IsSuccess = false,
                         Confidence = 0m,
-                        ErrorMessage = $"Azure OCR result request failed with status {(int)response.StatusCode}."
+                        ErrorMessage = BuildAzureErrorMessage("result", response, payload)
                     };
                 }
 
@@ -479,6 +481,47 @@ namespace Motor.Claim.Infrastructure.Shared.Services
             }
 
             return 1500 * (attempt + 1);
+        }
+
+        private static string BuildAzureErrorMessage(string requestType, HttpResponseMessage response, string payload)
+        {
+            var message = TryReadAzureErrorMessage(payload);
+            var baseMessage = $"Azure OCR {requestType} request failed with status {(int)response.StatusCode}.";
+
+            return string.IsNullOrWhiteSpace(message)
+                ? baseMessage
+                : $"{baseMessage} {message}";
+        }
+
+        private static string? TryReadAzureErrorMessage(string payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return null;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(payload);
+                var root = document.RootElement;
+
+                if (root.TryGetProperty("error", out var error) &&
+                    error.TryGetProperty("message", out var messageElement))
+                {
+                    return messageElement.GetString();
+                }
+
+                if (root.TryGetProperty("message", out messageElement))
+                {
+                    return messageElement.GetString();
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+
+            return null;
         }
 
         private enum DocumentKind

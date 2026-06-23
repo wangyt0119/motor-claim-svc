@@ -45,6 +45,8 @@ namespace Motor.Claim.Application.Dtos.Claim
         public DateTime? RequestedAt { get; set; }
         public DateTime? RespondedAt { get; set; }
         public DateTime? DecidedAt { get; set; }
+        public DateTime? WithdrawnAt { get; set; }
+        public string? WithdrawalReason { get; set; }
         public Guid? ReviewedByUserId { get; set; }
         public WorkshopAppointmentResponse? WorkshopAppointment { get; set; }
         public WorkshopRepairEstimateResponse? WorkshopRepairEstimate { get; set; }

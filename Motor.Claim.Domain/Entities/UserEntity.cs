@@ -38,6 +38,9 @@ namespace Motor.Claim.Domain.Entities
         public UserRole Role { get; set; }
 
         [Required]
+        public bool IsActive { get; set; } = true;
+
+        [Required]
         public string PasswordHash { get; set; }
 
         public string? PasswordResetTokenHash { get; set; }

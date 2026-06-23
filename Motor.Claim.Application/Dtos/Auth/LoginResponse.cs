@@ -7,6 +7,7 @@
         public string FullName { get; set; }
         public string Email { get; set; }
         public Motor.Claim.Domain.Enums.UserRole Role { get; set; }
+        public bool IsActive { get; set; }
         public Guid? WorkshopId { get; set; }
         public string? WorkshopName { get; set; }
     }

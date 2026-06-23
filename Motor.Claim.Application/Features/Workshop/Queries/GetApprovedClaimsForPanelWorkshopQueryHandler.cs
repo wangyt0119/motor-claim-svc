@@ -55,6 +55,8 @@ namespace Motor.Claim.Application.Features.Workshop.Queries
                 RequestedAt = claim.RequestedAt,
                 RespondedAt = claim.RespondedAt,
                 DecidedAt = claim.DecidedAt,
+                WithdrawnAt = claim.WithdrawnAt,
+                WithdrawalReason = claim.WithdrawalReason,
                 ReviewedByUserId = claim.ReviewedByUserId,
                 WorkshopAppointment = MapWorkshopAppointment(claim.WorkshopAppointment),
                 WorkshopRepairEstimate = claim.WorkshopRepairEstimate == null
@@ -99,6 +101,8 @@ namespace Motor.Claim.Application.Features.Workshop.Queries
                 TimeSlotStart = appointment.TimeSlotStart,
                 TimeSlotEnd = appointment.TimeSlotEnd,
                 Status = appointment.Status,
+                AssignmentType = appointment.AssignmentType,
+                WorkshopReferenceNumber = appointment.WorkshopReferenceNumber,
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt
             };

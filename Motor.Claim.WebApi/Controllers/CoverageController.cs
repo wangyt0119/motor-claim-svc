@@ -40,11 +40,16 @@ namespace Motor.Claim.API.Controllers
                     UserId = userId,
                     InsuredPersonName = request.InsuredPersonName,
                     VehicleNo = request.VehicleNo,
+                    VehicleMake = request.VehicleMake,
+                    VehicleModel = request.VehicleModel,
+                    Year = request.Year,
+                    ModelType = request.ModelType,
                     CoverageType = request.CoverageType,
                     AuthorizedDriver = request.AuthorizedDriver,
                     EffectiveDate = request.EffectiveDate,
                     ExpiryDate = request.ExpiryDate,
-                    CoverageLimitAmount = request.CoverageLimitAmount
+                    CoverageLimitAmount = request.CoverageLimitAmount,
+                    WindscreenCoverageLimitAmount = request.WindscreenCoverageLimitAmount
                 };
 
                 var result = await _createCoverageCommandHandler.Handle(command);
@@ -89,6 +94,10 @@ namespace Motor.Claim.API.Controllers
                 UserId = coverage.UserId,
                 InsuredPersonName = coverage.InsuredPersonName,
                 VehicleNo = coverage.VehicleNo,
+                VehicleMake = coverage.VehicleMake,
+                VehicleModel = coverage.VehicleModel,
+                Year = coverage.Year,
+                ModelType = coverage.ModelType,
                 CoverageType = coverage.CoverageType,
                 AuthorizedDriver = coverage.AuthorizedDriver,
                 EffectiveDate = coverage.EffectiveDate,
@@ -96,6 +105,9 @@ namespace Motor.Claim.API.Controllers
                 CoverageLimitAmount = coverage.CoverageLimitAmount,
                 UsedClaimAmount = coverage.UsedClaimAmount,
                 RemainingCoverageAmount = coverage.RemainingCoverageAmount,
+                WindscreenCoverageLimitAmount = coverage.WindscreenCoverageLimitAmount,
+                WindscreenUsedClaimAmount = coverage.WindscreenUsedClaimAmount,
+                WindscreenRemainingCoverageAmount = coverage.WindscreenRemainingCoverageAmount,
                 Claims = coverage.Claims.Select(claim => new ClaimResponse
                 {
                     ClaimId = claim.ClaimId,
@@ -132,6 +144,8 @@ namespace Motor.Claim.API.Controllers
                     RequestedAt = claim.RequestedAt,
                     RespondedAt = claim.RespondedAt,
                     DecidedAt = claim.DecidedAt,
+                    WithdrawnAt = claim.WithdrawnAt,
+                    WithdrawalReason = claim.WithdrawalReason,
                     ReviewedByUserId = claim.ReviewedByUserId,
                     WorkshopAppointment = MapWorkshopAppointment(claim.WorkshopAppointment),
                     WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate),
@@ -176,6 +190,8 @@ namespace Motor.Claim.API.Controllers
                 TimeSlotStart = appointment.TimeSlotStart,
                 TimeSlotEnd = appointment.TimeSlotEnd,
                 Status = appointment.Status,
+                AssignmentType = appointment.AssignmentType,
+                WorkshopReferenceNumber = appointment.WorkshopReferenceNumber,
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt
             };

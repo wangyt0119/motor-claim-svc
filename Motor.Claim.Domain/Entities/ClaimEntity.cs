@@ -53,10 +53,13 @@ namespace Motor.Claim.Domain.Entities
         public DateTime? RequestedAt { get; set; }
         public DateTime? RespondedAt { get; set; }
         public DateTime? DecidedAt { get; set; }
+        public DateTime? WithdrawnAt { get; set; }
+        public string? WithdrawalReason { get; set; }
         public Guid? ReviewedByUserId { get; set; }
         public WorkshopAppointmentEntity? WorkshopAppointment { get; set; }
         public WorkshopRepairEstimateEntity? WorkshopRepairEstimate { get; set; }
         public WorkshopPaymentEntity? WorkshopPayment { get; set; }
+        public ICollection<WorkshopClaimLinkRequestEntity> WorkshopClaimLinkRequests { get; set; } = new List<WorkshopClaimLinkRequestEntity>();
 
         [NotMapped]
         public bool? EmailNotificationSent { get; set; }

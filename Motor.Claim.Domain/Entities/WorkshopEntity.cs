@@ -37,6 +37,7 @@ namespace Motor.Claim.Domain.Entities
         public bool IsActive { get; set; } = true;
 
         public ICollection<WorkshopAppointmentEntity> Appointments { get; set; } = new List<WorkshopAppointmentEntity>();
+        public ICollection<WorkshopClaimLinkRequestEntity> ClaimLinkRequests { get; set; } = new List<WorkshopClaimLinkRequestEntity>();
         public ICollection<WorkshopRepairEstimateEntity> RepairEstimates { get; set; } = new List<WorkshopRepairEstimateEntity>();
         public ICollection<WorkshopPaymentEntity> Payments { get; set; } = new List<WorkshopPaymentEntity>();
         public ICollection<UserEntity> Users { get; set; } = new List<UserEntity>();

@@ -34,9 +34,19 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Claim not found.");
             }
 
+            if (string.Equals(claim.Status, "Withdrawn", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("A repair estimate cannot be submitted for a withdrawn claim.");
+            }
+
             if (claim.WorkshopAppointment == null || claim.WorkshopAppointment.WorkshopId != workshopId)
             {
                 throw new ArgumentException("This claim is not assigned to your workshop.");
+            }
+
+            if (string.Equals(claim.WorkshopAppointment.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("A repair estimate cannot be submitted for a cancelled workshop booking.");
             }
 
             var canRepair = string.Equals(claim.ReviewStatus, "Approved", StringComparison.OrdinalIgnoreCase)
@@ -207,7 +217,10 @@ namespace Motor.Claim.Application.Services
 
         private static void ApplyCoverageSplit(WorkshopRepairEstimateEntity estimate, CoverageEntity coverage)
         {
-            var remainingCoverageAmount = Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
+            var isWindscreenClaim = estimate.Claim?.MotorClaimType == MotorClaimType.Windscreen;
+            var remainingCoverageAmount = isWindscreenClaim
+                ? Math.Max(coverage.WindscreenCoverageLimitAmount - coverage.WindscreenUsedClaimAmount, 0m)
+                : Math.Max(coverage.CoverageLimitAmount - coverage.UsedClaimAmount, 0m);
             var insurancePayableAmount = Math.Min(estimate.TotalAmount, remainingCoverageAmount);
 
             estimate.InsurancePayableAmount = insurancePayableAmount;

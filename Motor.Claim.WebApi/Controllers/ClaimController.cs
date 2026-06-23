@@ -161,6 +161,22 @@ namespace Motor.Claim.API.Controllers
             }
         }
 
+        [HttpPost("{id:guid}/withdraw")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> Withdraw(Guid id, [FromBody] WithdrawClaimRequest request)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _claimService.WithdrawAsync(id, userId, request.Reason);
+                return Ok(MapResponse(result));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         private static ClaimResponse MapResponse(Motor.Claim.Domain.Entities.ClaimEntity claim)
         {
             return new ClaimResponse
@@ -199,6 +215,8 @@ namespace Motor.Claim.API.Controllers
                 RequestedAt = claim.RequestedAt,
                 RespondedAt = claim.RespondedAt,
                 DecidedAt = claim.DecidedAt,
+                WithdrawnAt = claim.WithdrawnAt,
+                WithdrawalReason = claim.WithdrawalReason,
                 ReviewedByUserId = claim.ReviewedByUserId,
                 WorkshopAppointment = MapWorkshopAppointment(claim.WorkshopAppointment),
                 WorkshopRepairEstimate = MapWorkshopRepairEstimate(claim.WorkshopRepairEstimate),
@@ -242,6 +260,8 @@ namespace Motor.Claim.API.Controllers
                 TimeSlotStart = appointment.TimeSlotStart,
                 TimeSlotEnd = appointment.TimeSlotEnd,
                 Status = appointment.Status,
+                AssignmentType = appointment.AssignmentType,
+                WorkshopReferenceNumber = appointment.WorkshopReferenceNumber,
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt
             };

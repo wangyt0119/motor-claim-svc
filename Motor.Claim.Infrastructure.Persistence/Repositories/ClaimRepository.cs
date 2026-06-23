@@ -59,12 +59,22 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                 x.CreatedAt >= submittedSinceUtc);
         }
 
+        public async Task<bool> HasActiveClaimForCoverageAsync(Guid coverageId)
+        {
+            return await _context.Claims.AnyAsync(x =>
+                x.CoverageId == coverageId &&
+                x.Status != "Approved" &&
+                x.Status != "Rejected" &&
+                x.Status != "Withdrawn");
+        }
+
         public async Task<List<ClaimEntity>> GetApprovedClaimsByWorkshopIdAsync(Guid workshopId)
         {
             return await _context.Claims
                 .Where(x =>
                     x.WorkshopAppointment != null &&
                     x.WorkshopAppointment.WorkshopId == workshopId &&
+                    x.Status != "Withdrawn" &&
                     (x.ReviewStatus == "Approved" ||
                      x.STPStatus == StpStatus.AutoApproved ||
                      x.IsSTPApproved))

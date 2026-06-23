@@ -16,6 +16,7 @@ namespace Motor.Claim.Application.Dtos.Auth
         public string Email { get; set; } = string.Empty;
         public bool IsMaybankGroupEmployee { get; set; }
         public UserRole Role { get; set; }
+        public bool IsActive { get; set; }
         public Guid? WorkshopId { get; set; }
         public WorkshopResponse? Workshop { get; set; }
     }

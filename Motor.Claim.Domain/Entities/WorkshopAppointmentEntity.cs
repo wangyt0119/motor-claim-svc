@@ -28,6 +28,11 @@ namespace Motor.Claim.Domain.Entities
         [Required]
         public string Status { get; set; } = "Pending";
 
+        [Required]
+        public string AssignmentType { get; set; } = "ScheduledAppointment";
+
+        public string? WorkshopReferenceNumber { get; set; }
+
         public string? Notes { get; set; }
 
         [NotMapped]

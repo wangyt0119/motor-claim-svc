@@ -26,6 +26,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Payments:Stripe"));
 builder.Services.Configure<SmtpEmailOptions>(builder.Configuration.GetSection("Notifications:Smtp"));
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("AI:Gemini"));
 
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
@@ -34,16 +35,19 @@ builder.Services.AddScoped<ICoverageRepository, CoverageRepository>();
 builder.Services.AddScoped<IClaimRepository, ClaimRepository>();
 builder.Services.AddScoped<IWorkshopRepository, WorkshopRepository>();
 builder.Services.AddScoped<IWorkshopAppointmentRepository, WorkshopAppointmentRepository>();
+builder.Services.AddScoped<IWorkshopClaimLinkRequestRepository, WorkshopClaimLinkRequestRepository>();
 builder.Services.AddScoped<IWorkshopRepairEstimateRepository, WorkshopRepairEstimateRepository>();
 builder.Services.AddScoped<IWorkshopPaymentRepository, WorkshopPaymentRepository>();
 builder.Services.AddScoped<ISystemActivityLogRepository, SystemActivityLogRepository>();
 builder.Services.AddScoped<IWorkshopPaymentProviderResolver, WorkshopPaymentProviderResolver>();
 builder.Services.AddScoped<IEmailNotificationService, SmtpEmailNotificationService>();
+builder.Services.AddHttpClient<IGeminiDamageAssessmentService, GeminiDamageAssessmentService>();
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<CoverageService>();
 builder.Services.AddScoped<ClaimService>();
 builder.Services.AddScoped<WorkshopService>();
+builder.Services.AddScoped<WorkshopClaimLinkRequestService>();
 builder.Services.AddScoped<WorkshopRepairEstimateService>();
 builder.Services.AddScoped<WorkshopPaymentService>();
 builder.Services.AddScoped<StripeConnectService>();
@@ -138,7 +142,7 @@ app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
-//app.UseMiddleware<SystemActivityLoggingMiddleware>();
+app.UseMiddleware<SystemActivityLoggingMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

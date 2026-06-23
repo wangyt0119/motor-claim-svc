@@ -37,7 +37,8 @@ namespace Motor.Claim.WebApi.Controllers
                     user.IssueCountry,
                     user.MobileCountry,
                     user.MobileNumber,
-                    user.IsMaybankGroupEmployee
+                    user.IsMaybankGroupEmployee,
+                    user.IsActive
                 });
             }
             catch (ArgumentException ex)
@@ -72,6 +73,7 @@ namespace Motor.Claim.WebApi.Controllers
                     user.MobileCountry,
                     user.MobileNumber,
                     user.IsMaybankGroupEmployee,
+                    user.IsActive,
                     user.WorkshopId
                 });
             }

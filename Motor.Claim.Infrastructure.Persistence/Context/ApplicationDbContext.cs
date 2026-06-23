@@ -15,6 +15,7 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
         public DbSet<ClaimEntity> Claims { get; set; }
         public DbSet<WorkshopEntity> Workshops { get; set; }
         public DbSet<WorkshopAppointmentEntity> WorkshopAppointments { get; set; }
+        public DbSet<WorkshopClaimLinkRequestEntity> WorkshopClaimLinkRequests { get; set; }
         public DbSet<WorkshopRepairEstimateEntity> WorkshopRepairEstimates { get; set; }
         public DbSet<WorkshopPaymentEntity> WorkshopPayments { get; set; }
         public DbSet<SystemActivityLogEntity> SystemActivityLogs { get; set; }
@@ -40,6 +41,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
                 .WithMany(cv => cv.Claims)
                 .HasForeignKey(c => c.CoverageId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ClaimEntity>()
+                .Property(x => x.WithdrawalReason)
+                .HasMaxLength(500);
 
             modelBuilder.Entity<WorkshopEntity>()
                 .Property(x => x.Name)
@@ -68,6 +73,46 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
                 .WithMany(x => x.Appointments)
                 .HasForeignKey(x => x.WorkshopId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopAppointmentEntity>()
+                .Property(x => x.AssignmentType)
+                .HasMaxLength(50)
+                .HasDefaultValue("ScheduledAppointment");
+
+            modelBuilder.Entity<WorkshopAppointmentEntity>()
+                .Property(x => x.WorkshopReferenceNumber)
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .HasOne(x => x.Claim)
+                .WithMany(x => x.WorkshopClaimLinkRequests)
+                .HasForeignKey(x => x.ClaimId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .HasOne(x => x.Workshop)
+                .WithMany(x => x.ClaimLinkRequests)
+                .HasForeignKey(x => x.WorkshopId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .Property(x => x.Status)
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .Property(x => x.WorkshopReferenceNumber)
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .Property(x => x.Notes)
+                .HasMaxLength(1000);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .Property(x => x.CustomerResponseNote)
+                .HasMaxLength(500);
+
+            modelBuilder.Entity<WorkshopClaimLinkRequestEntity>()
+                .HasIndex(x => new { x.ClaimId, x.Status });
 
             modelBuilder.Entity<WorkshopRepairEstimateEntity>()
                 .HasKey(x => x.EstimateId);
@@ -106,6 +151,18 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<CoverageEntity>()
                 .Property(x => x.RemainingCoverageAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<CoverageEntity>()
+                .Property(x => x.WindscreenCoverageLimitAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<CoverageEntity>()
+                .Property(x => x.WindscreenUsedClaimAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<CoverageEntity>()
+                .Property(x => x.WindscreenRemainingCoverageAmount)
                 .HasColumnType("decimal(18,2)");
 
             modelBuilder.Entity<WorkshopPaymentEntity>()
@@ -158,6 +215,10 @@ namespace Motor.Claim.Infrastructure.Persistence.Context
             modelBuilder.Entity<UserEntity>()
                 .Property(x => x.PasswordResetTokenHash)
                 .HasMaxLength(64);
+
+            modelBuilder.Entity<UserEntity>()
+                .Property(x => x.IsActive)
+                .HasDefaultValue(true);
 
             modelBuilder.Entity<SystemActivityLogEntity>()
                 .Property(x => x.Module)

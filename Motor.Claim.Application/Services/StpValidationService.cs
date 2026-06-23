@@ -189,17 +189,21 @@ namespace Motor.Claim.Application.Services
             result.DocumentDiagnostics.Add(policeDiagnostic);
             result.DocumentDiagnostics.Add(licenseDiagnostic);
 
+            var requiresVehicleDocuments = RequiresVehicleDocuments(claim);
+            var requiresDrivingLicense = RequiresDrivingLicense(claim);
+            var requiresPoliceReport = RequiresPoliceReport(claim);
+
             var criticalChecksPassed =
                 result.IsDocumentComplete &&
                 result.AreEvidenceImagesPresent &&
                 identity != null &&
-                vehicleOwnership != null &&
-                policeReport != null &&
-                (drivingLicense != null || IsTransientThrottleFailure(licenseDiagnostic.ErrorMessage)) &&
+                (!requiresVehicleDocuments || vehicleOwnership != null) &&
+                (!requiresPoliceReport || policeReport != null) &&
+                (!requiresDrivingLicense || drivingLicense != null || IsTransientThrottleFailure(licenseDiagnostic.ErrorMessage)) &&
                 result.IsIdentityMatched &&
-                result.IsVehicleMatched &&
-                result.IsPoliceReportMatched &&
-                (result.IsDrivingLicenseMatched || IsTransientThrottleFailure(licenseDiagnostic.ErrorMessage)) &&
+                (!requiresVehicleDocuments || result.IsVehicleMatched) &&
+                (!requiresPoliceReport || result.IsPoliceReportMatched) &&
+                (!requiresDrivingLicense || result.IsDrivingLicenseMatched || IsTransientThrottleFailure(licenseDiagnostic.ErrorMessage)) &&
                 HasNoCriticalExtractionFailure(result);
 
             result.IsApproved = criticalChecksPassed;
@@ -217,14 +221,32 @@ namespace Motor.Claim.Application.Services
         {
             var requiredDocuments = new List<(string Name, string? Value)>
             {
-                ("PoliceReportDocument", claim.PoliceReportDocument),
                 ("IdentityDocumentFront", claim.IdentityDocumentFront)
             };
 
-            if (claim.AllClaimType == AllClaimType.VehicleClaim)
+            if (claim.MotorClaimType == MotorClaimType.Windscreen)
+            {
+                requiredDocuments.Add(("IdentityDocumentBack", claim.IdentityDocumentBack));
+            }
+
+            if (RequiresPoliceReport(claim))
+            {
+                requiredDocuments.Add(("PoliceReportDocument", claim.PoliceReportDocument));
+            }
+
+            if (RequiresVehicleDocuments(claim))
             {
                 requiredDocuments.Add(("VehicleOwnershipCertificateDocument", claim.VehicleOwnershipCertificateDocument));
+            }
+
+            if (RequiresDrivingLicense(claim))
+            {
                 requiredDocuments.Add(("DrivingLicenseFront", claim.DrivingLicenseFront));
+
+                if (claim.MotorClaimType == MotorClaimType.Windscreen)
+                {
+                    requiredDocuments.Add(("DrivingLicenseBack", claim.DrivingLicenseBack));
+                }
             }
 
             return requiredDocuments;
@@ -232,8 +254,20 @@ namespace Motor.Claim.Application.Services
 
         private static bool HasRequiredEvidenceImages(ClaimEntity claim)
         {
-            if (claim.AllClaimType == AllClaimType.VehicleClaim &&
-                claim.MotorClaimType == MotorClaimType.VehicleDamages)
+            if (claim.AllClaimType != AllClaimType.VehicleClaim)
+            {
+                return true;
+            }
+
+            if (claim.MotorClaimType == MotorClaimType.Windscreen)
+            {
+                return HasValue(claim.VehicleDamageFrontLeftDocument) ||
+                       HasValue(claim.VehicleDamageFrontRightDocument) ||
+                       HasValue(claim.VehicleDamageRearLeftDocument) ||
+                       HasValue(claim.VehicleDamageRearRightDocument);
+            }
+
+            if (claim.MotorClaimType != MotorClaimType.VehicleDamages)
             {
                 return true;
             }
@@ -245,6 +279,23 @@ namespace Motor.Claim.Application.Services
                 HasValue(claim.VehicleDamageRearRightDocument);
 
             return hasAllEvidenceImages;
+        }
+
+        private static bool RequiresVehicleDocuments(ClaimEntity claim)
+        {
+            return claim.AllClaimType == AllClaimType.VehicleClaim;
+        }
+
+        private static bool RequiresDrivingLicense(ClaimEntity claim)
+        {
+            return claim.MotorClaimType == MotorClaimType.VehicleDamages ||
+                   claim.MotorClaimType == MotorClaimType.Windscreen;
+        }
+
+        private static bool RequiresPoliceReport(ClaimEntity claim)
+        {
+            return claim.AllClaimType != AllClaimType.VehicleClaim ||
+                   claim.MotorClaimType != MotorClaimType.Windscreen;
         }
 
         private static void EvaluateExtraction(StpValidationResultDto result, OcrExtractionResult extraction, OcrDocumentDiagnosticDto diagnostic)

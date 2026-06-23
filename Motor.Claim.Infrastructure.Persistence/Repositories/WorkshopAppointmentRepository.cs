@@ -18,5 +18,25 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                 .Include(x => x.Claim)
                 .FirstOrDefaultAsync(x => x.ClaimId == claimId);
         }
+
+        public async Task<WorkshopAppointmentEntity?> GetConflictingScheduledSlotAsync(
+            Guid workshopId,
+            DateTime preferredDate,
+            TimeSpan timeSlotStart,
+            TimeSpan timeSlotEnd,
+            Guid? excludedClaimId = null)
+        {
+            return await _context.WorkshopAppointments
+                .Include(x => x.Workshop)
+                .Include(x => x.Claim)
+                .FirstOrDefaultAsync(x =>
+                    x.WorkshopId == workshopId &&
+                    x.PreferredDate.Date == preferredDate.Date &&
+                    x.AssignmentType == "ScheduledAppointment" &&
+                    x.Status != "Cancelled" &&
+                    (!excludedClaimId.HasValue || x.ClaimId != excludedClaimId.Value) &&
+                    x.TimeSlotStart < timeSlotEnd &&
+                    timeSlotStart < x.TimeSlotEnd);
+        }
     }
 }

@@ -7,6 +7,7 @@ namespace Motor.Claim.Application.Services
     public class CoverageService
     {
         private const decimal DefaultCoverageLimitAmount = 50000m;
+        private const decimal DefaultWindscreenCoverageLimitAmount = 0m;
         private readonly ICoverageRepository _coverageRepository;
 
         public CoverageService(ICoverageRepository coverageRepository)
@@ -26,7 +27,18 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Coverage limit amount cannot be negative.");
             }
 
+            if (command.WindscreenCoverageLimitAmount is < 0)
+            {
+                throw new ArgumentException("Windscreen coverage limit amount cannot be negative.");
+            }
+
+            if (command.Year <= 0)
+            {
+                throw new ArgumentException("Vehicle year must be greater than zero.");
+            }
+
             var coverageLimitAmount = command.CoverageLimitAmount ?? DefaultCoverageLimitAmount;
+            var windscreenCoverageLimitAmount = command.WindscreenCoverageLimitAmount ?? DefaultWindscreenCoverageLimitAmount;
 
             var coverage = new CoverageEntity
             {
@@ -35,13 +47,20 @@ namespace Motor.Claim.Application.Services
                 UserId = command.UserId,
                 InsuredPersonName = command.InsuredPersonName,
                 VehicleNo = command.VehicleNo,
+                VehicleMake = command.VehicleMake,
+                VehicleModel = command.VehicleModel,
+                Year = command.Year,
+                ModelType = command.ModelType,
                 CoverageType = command.CoverageType,
                 AuthorizedDriver = command.AuthorizedDriver,
                 EffectiveDate = command.EffectiveDate,
                 ExpiryDate = command.ExpiryDate,
                 CoverageLimitAmount = coverageLimitAmount,
                 UsedClaimAmount = 0m,
-                RemainingCoverageAmount = coverageLimitAmount
+                RemainingCoverageAmount = coverageLimitAmount,
+                WindscreenCoverageLimitAmount = windscreenCoverageLimitAmount,
+                WindscreenUsedClaimAmount = 0m,
+                WindscreenRemainingCoverageAmount = windscreenCoverageLimitAmount
             };
 
             return await _coverageRepository.AddAsync(coverage);

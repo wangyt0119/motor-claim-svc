@@ -133,6 +133,11 @@ namespace Motor.Claim.Application.Services
                 return null;
             }
 
+            if (!user.IsActive)
+            {
+                return null;
+            }
+
             var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
             if (result == PasswordVerificationResult.Failed)
@@ -152,6 +157,7 @@ namespace Motor.Claim.Application.Services
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 WorkshopId = user.WorkshopId,
                 WorkshopName = workshopName
             };
@@ -223,16 +229,104 @@ namespace Motor.Claim.Application.Services
 
         public async Task<UserProfileResponse?> GetProfileAsync(Guid userId)
         {
-            var user = await _userRepository.GetByIdAsync(userId);
+            var user = await _userRepository.GetByIdWithWorkshopAsync(userId);
             if (user == null)
             {
                 return null;
             }
 
-            var workshop = user.WorkshopId.HasValue
-                ? await _workshopRepository.GetByIdAsync(user.WorkshopId.Value)
-                : null;
+            return MapProfile(user);
+        }
 
+        public async Task<List<UserProfileResponse>> GetUsersAsync(UserRole? role, bool? isActive)
+        {
+            var users = await _userRepository.GetUsersAsync(role, isActive);
+            return users.Select(MapProfile).ToList();
+        }
+
+        public async Task<UserProfileResponse> UpdateUserAccountAsync(Guid userId, UpdateUserAccountRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new ArgumentException("User not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FullName))
+            {
+                throw new ArgumentException("Full name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                throw new ArgumentException("Email is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.MobileNumber))
+            {
+                throw new ArgumentException("Mobile number is required.");
+            }
+
+            var normalizedEmail = request.Email.Trim();
+            var existingUser = await _userRepository.GetByEmailAsync(normalizedEmail);
+            if (existingUser != null && existingUser.UserId != userId)
+            {
+                throw new ArgumentException("Email already exists.");
+            }
+
+            if (request.Role == UserRole.PanelWorkshop)
+            {
+                if (!request.WorkshopId.HasValue)
+                {
+                    throw new ArgumentException("WorkshopId is required for PanelWorkshop users.");
+                }
+
+                var workshop = await _workshopRepository.GetByIdAsync(request.WorkshopId.Value);
+                if (workshop == null)
+                {
+                    throw new ArgumentException("Selected workshop does not exist.");
+                }
+
+                if (!workshop.IsPanelWorkshop)
+                {
+                    throw new ArgumentException("Selected workshop is not marked as a panel workshop.");
+                }
+
+                if (!workshop.IsActive)
+                {
+                    throw new ArgumentException("Selected workshop is not active.");
+                }
+            }
+
+            user.FullName = request.FullName.Trim();
+            user.Email = normalizedEmail;
+            user.MobileCountry = request.MobileCountry;
+            user.MobileNumber = request.MobileNumber.Trim();
+            user.Role = request.Role;
+            user.WorkshopId = request.Role == UserRole.PanelWorkshop ? request.WorkshopId : null;
+            user.IsActive = request.IsActive;
+
+            await _userRepository.UpdateAsync(user);
+
+            return (await GetProfileAsync(userId))!;
+        }
+
+        public async Task<UserProfileResponse> SetUserActiveStatusAsync(Guid userId, bool isActive)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new ArgumentException("User not found.");
+            }
+
+            user.IsActive = isActive;
+            await _userRepository.UpdateAsync(user);
+
+            return (await GetProfileAsync(userId))!;
+        }
+
+        private static UserProfileResponse MapProfile(UserEntity user)
+        {
             return new UserProfileResponse
             {
                 UserId = user.UserId,
@@ -246,28 +340,29 @@ namespace Motor.Claim.Application.Services
                 Email = user.Email,
                 IsMaybankGroupEmployee = user.IsMaybankGroupEmployee,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 WorkshopId = user.WorkshopId,
-                Workshop = workshop == null
+                Workshop = user.Workshop == null
                     ? null
                     : new Motor.Claim.Application.Dtos.Workshop.WorkshopResponse
                     {
-                        WorkshopId = workshop.WorkshopId,
-                        Name = workshop.Name,
-                        State = workshop.State,
-                        Address = workshop.Address,
-                        Phone = DeserializeOptionalList(workshop.Phone),
-                        Fax = workshop.Fax,
-                        Email = DeserializeOptionalList(workshop.Email),
-                        BankName = workshop.BankName,
-                        BankAccountNumber = workshop.BankAccountNumber,
-                        BankAccountHolderName = workshop.BankAccountHolderName,
-                        StripeConnectedAccountId = workshop.StripeConnectedAccountId,
-                        StripeOnboardingStatus = workshop.StripeOnboardingStatus,
-                        StripeChargesEnabled = workshop.StripeChargesEnabled,
-                        StripePayoutsEnabled = workshop.StripePayoutsEnabled,
-                        StripeLastSyncedAt = workshop.StripeLastSyncedAt,
-                        IsPanelWorkshop = workshop.IsPanelWorkshop,
-                        IsActive = workshop.IsActive
+                        WorkshopId = user.Workshop.WorkshopId,
+                        Name = user.Workshop.Name,
+                        State = user.Workshop.State,
+                        Address = user.Workshop.Address,
+                        Phone = DeserializeOptionalList(user.Workshop.Phone),
+                        Fax = user.Workshop.Fax,
+                        Email = DeserializeOptionalList(user.Workshop.Email),
+                        BankName = user.Workshop.BankName,
+                        BankAccountNumber = user.Workshop.BankAccountNumber,
+                        BankAccountHolderName = user.Workshop.BankAccountHolderName,
+                        StripeConnectedAccountId = user.Workshop.StripeConnectedAccountId,
+                        StripeOnboardingStatus = user.Workshop.StripeOnboardingStatus,
+                        StripeChargesEnabled = user.Workshop.StripeChargesEnabled,
+                        StripePayoutsEnabled = user.Workshop.StripePayoutsEnabled,
+                        StripeLastSyncedAt = user.Workshop.StripeLastSyncedAt,
+                        IsPanelWorkshop = user.Workshop.IsPanelWorkshop,
+                        IsActive = user.Workshop.IsActive
                     }
             };
         }

@@ -13,6 +13,7 @@ namespace Motor.Claim.Application.Services
     {
         private readonly IWorkshopRepository _workshopRepository;
         private readonly IWorkshopAppointmentRepository _workshopAppointmentRepository;
+        private readonly IWorkshopRepairEstimateRepository _workshopRepairEstimateRepository;
         private readonly IClaimRepository _claimRepository;
         private readonly IUserRepository _userRepository;
         private readonly IEmailNotificationService _emailNotificationService;
@@ -20,12 +21,14 @@ namespace Motor.Claim.Application.Services
         public WorkshopService(
             IWorkshopRepository workshopRepository,
             IWorkshopAppointmentRepository workshopAppointmentRepository,
+            IWorkshopRepairEstimateRepository workshopRepairEstimateRepository,
             IClaimRepository claimRepository,
             IUserRepository userRepository,
             IEmailNotificationService emailNotificationService)
         {
             _workshopRepository = workshopRepository;
             _workshopAppointmentRepository = workshopAppointmentRepository;
+            _workshopRepairEstimateRepository = workshopRepairEstimateRepository;
             _claimRepository = claimRepository;
             _userRepository = userRepository;
             _emailNotificationService = emailNotificationService;
@@ -128,6 +131,11 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("You are not allowed to book a workshop for this claim.");
             }
 
+            if (string.Equals(claim.Status, "Withdrawn", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("A withdrawn claim cannot be booked with a workshop.");
+            }
+
             if (claim.AllClaimType != AllClaimType.VehicleClaim)
             {
                 throw new ArgumentException("Workshop booking is only available for vehicle claims.");
@@ -151,6 +159,8 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Time slot end must be later than time slot start.");
             }
 
+            await EnsureNoWorkshopQuotationAsync(request.ClaimId);
+
             var workshop = await _workshopRepository.GetByIdAsync(request.WorkshopId);
             if (workshop == null || !workshop.IsActive || !workshop.IsPanelWorkshop)
             {
@@ -158,6 +168,17 @@ namespace Motor.Claim.Application.Services
             }
 
             var existingAppointment = await _workshopAppointmentRepository.GetByClaimIdAsync(request.ClaimId);
+            var conflictingAppointment = await _workshopAppointmentRepository.GetConflictingScheduledSlotAsync(
+                request.WorkshopId,
+                request.PreferredDate,
+                request.TimeSlotStart,
+                request.TimeSlotEnd,
+                request.ClaimId);
+
+            if (conflictingAppointment != null)
+            {
+                throw new ArgumentException("This workshop time slot is already booked. Please choose another date or time.");
+            }
 
             if (existingAppointment == null)
             {
@@ -171,6 +192,7 @@ namespace Motor.Claim.Application.Services
                     TimeSlotStart = request.TimeSlotStart,
                     TimeSlotEnd = request.TimeSlotEnd,
                     Status = "Pending",
+                    AssignmentType = "ScheduledAppointment",
                     Notes = request.Notes
                 };
 
@@ -184,6 +206,8 @@ namespace Motor.Claim.Application.Services
                 existingAppointment.TimeSlotEnd = request.TimeSlotEnd;
                 existingAppointment.Notes = request.Notes;
                 existingAppointment.Status = "Pending";
+                existingAppointment.AssignmentType = "ScheduledAppointment";
+                existingAppointment.WorkshopReferenceNumber = null;
 
                 await _workshopAppointmentRepository.UpdateAsync(existingAppointment);
             }
@@ -193,6 +217,98 @@ namespace Motor.Claim.Application.Services
 
             await SendWorkshopAppointmentNotificationsAsync(claim, workshop, savedAppointment);
             return MapAppointmentResponse(savedAppointment);
+        }
+
+        public async Task<WorkshopAppointmentResponse> AssignVehicleAlreadyAtWorkshopAsync(
+            Guid userId,
+            AssignVehicleAlreadyAtWorkshopRequest request)
+        {
+            var claim = await _claimRepository.GetByIdAsync(request.ClaimId);
+            if (claim == null)
+            {
+                throw new ArgumentException("Claim not found.");
+            }
+
+            if (claim.UserId != userId)
+            {
+                throw new ArgumentException("You are not allowed to assign a workshop for this claim.");
+            }
+
+            if (string.Equals(claim.Status, "Withdrawn", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("A withdrawn claim cannot be assigned to a workshop.");
+            }
+
+            if (claim.AllClaimType != AllClaimType.VehicleClaim)
+            {
+                throw new ArgumentException("Workshop assignment is only available for vehicle claims.");
+            }
+
+            var isOfficerApproved = string.Equals(claim.ReviewStatus, "Approved", StringComparison.OrdinalIgnoreCase);
+            var isStpApproved = claim.STPStatus == StpStatus.AutoApproved || claim.IsSTPApproved;
+            if (!isOfficerApproved && !isStpApproved)
+            {
+                throw new ArgumentException("Workshop assignment is only available after STP approval or officer approval.");
+            }
+
+            if (request.ArrivalDate == default)
+            {
+                throw new ArgumentException("Vehicle arrival date is required.");
+            }
+
+            if (request.ArrivalDate.Date < claim.IncidentDate.Date)
+            {
+                throw new ArgumentException("Vehicle arrival date cannot be earlier than the incident date.");
+            }
+
+            if (request.ArrivalDate.Date > DateTime.Today)
+            {
+                throw new ArgumentException("Vehicle arrival date cannot be in the future.");
+            }
+
+            await EnsureNoWorkshopQuotationAsync(request.ClaimId);
+
+            var workshop = await _workshopRepository.GetByIdAsync(request.WorkshopId);
+            if (workshop == null || !workshop.IsActive || !workshop.IsPanelWorkshop)
+            {
+                throw new ArgumentException("Selected workshop is not an active panel workshop.");
+            }
+
+            var existingAssignment = await _workshopAppointmentRepository.GetByClaimIdAsync(request.ClaimId);
+            var isNewAssignment = existingAssignment == null;
+            if (existingAssignment == null)
+            {
+                existingAssignment = new WorkshopAppointmentEntity
+                {
+                    AppointmentId = Guid.NewGuid(),
+                    CreatedAt = DateTime.UtcNow,
+                    ClaimId = request.ClaimId
+                };
+            }
+
+            existingAssignment.WorkshopId = request.WorkshopId;
+            existingAssignment.PreferredDate = request.ArrivalDate.Date;
+            existingAssignment.TimeSlotStart = TimeSpan.Zero;
+            existingAssignment.TimeSlotEnd = TimeSpan.Zero;
+            existingAssignment.Status = "VehicleAtWorkshop";
+            existingAssignment.AssignmentType = "AlreadyAtWorkshop";
+            existingAssignment.WorkshopReferenceNumber = NormalizeOptional(request.WorkshopReferenceNumber);
+            existingAssignment.Notes = NormalizeOptional(request.Notes);
+
+            if (isNewAssignment)
+            {
+                await _workshopAppointmentRepository.AddAsync(existingAssignment);
+            }
+            else
+            {
+                await _workshopAppointmentRepository.UpdateAsync(existingAssignment);
+            }
+
+            var savedAssignment = await _workshopAppointmentRepository.GetByClaimIdAsync(request.ClaimId)
+                ?? throw new InvalidOperationException("Workshop assignment could not be loaded after save.");
+
+            await SendWorkshopAppointmentNotificationsAsync(claim, workshop, savedAssignment);
+            return MapAppointmentResponse(savedAssignment);
         }
 
         public async Task<WorkshopAppointmentResponse?> GetAppointmentByClaimAsync(Guid userId, Guid claimId, bool enforceOwnership = true)
@@ -285,6 +401,8 @@ namespace Motor.Claim.Application.Services
                 TimeSlotStart = appointment.TimeSlotStart,
                 TimeSlotEnd = appointment.TimeSlotEnd,
                 Status = appointment.Status,
+                AssignmentType = appointment.AssignmentType,
+                WorkshopReferenceNumber = appointment.WorkshopReferenceNumber,
                 Notes = appointment.Notes,
                 EmailNotificationSent = appointment.EmailNotificationSent,
                 EmailNotificationMessage = appointment.EmailNotificationMessage,
@@ -307,6 +425,14 @@ namespace Motor.Claim.Application.Services
             if (string.IsNullOrWhiteSpace(address))
             {
                 throw new ArgumentException("Workshop address is required.");
+            }
+        }
+
+        private async Task EnsureNoWorkshopQuotationAsync(Guid claimId)
+        {
+            if (await _workshopRepairEstimateRepository.GetByClaimIdAsync(claimId) != null)
+            {
+                throw new ArgumentException("The assigned workshop cannot be changed after a quotation has been submitted.");
             }
         }
 
@@ -400,22 +526,42 @@ namespace Motor.Claim.Application.Services
             bool forWorkshop)
         {
             var builder = new StringBuilder();
+            var isAlreadyAtWorkshop = string.Equals(
+                appointment.AssignmentType,
+                "AlreadyAtWorkshop",
+                StringComparison.OrdinalIgnoreCase);
 
             if (forWorkshop)
             {
-                builder.AppendLine("<p>A customer has selected your panel workshop for an approved motor claim.</p>");
+                builder.AppendLine(isAlreadyAtWorkshop
+                    ? "<p>A customer has confirmed that their vehicle is already at your panel workshop for an approved motor claim.</p>"
+                    : "<p>A customer has selected your panel workshop for an approved motor claim.</p>");
             }
             else
             {
-                builder.AppendLine("<p>Your panel workshop selection has been recorded successfully.</p>");
+                builder.AppendLine(isAlreadyAtWorkshop
+                    ? "<p>Your vehicle-at-workshop assignment has been recorded successfully.</p>"
+                    : "<p>Your panel workshop selection has been recorded successfully.</p>");
             }
 
             builder.AppendLine($"<p><strong>Claim ID:</strong> {claim.ClaimId}</p>");
             builder.AppendLine($"<p><strong>Workshop:</strong> {WebUtility.HtmlEncode(workshop.Name)}</p>");
             builder.AppendLine($"<p><strong>State:</strong> {WebUtility.HtmlEncode(workshop.State)}</p>");
             builder.AppendLine($"<p><strong>Address:</strong> {WebUtility.HtmlEncode(workshop.Address)}</p>");
-            builder.AppendLine($"<p><strong>Preferred Date:</strong> {appointment.PreferredDate:dd MMM yyyy}</p>");
-            builder.AppendLine($"<p><strong>Time Slot:</strong> {appointment.TimeSlotStart:hh\\:mm} - {appointment.TimeSlotEnd:hh\\:mm}</p>");
+            if (isAlreadyAtWorkshop)
+            {
+                builder.AppendLine($"<p><strong>Vehicle Arrival Date:</strong> {appointment.PreferredDate:dd MMM yyyy}</p>");
+            }
+            else
+            {
+                builder.AppendLine($"<p><strong>Preferred Date:</strong> {appointment.PreferredDate:dd MMM yyyy}</p>");
+                builder.AppendLine($"<p><strong>Time Slot:</strong> {appointment.TimeSlotStart:hh\\:mm} - {appointment.TimeSlotEnd:hh\\:mm}</p>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(appointment.WorkshopReferenceNumber))
+            {
+                builder.AppendLine($"<p><strong>Workshop Reference:</strong> {WebUtility.HtmlEncode(appointment.WorkshopReferenceNumber)}</p>");
+            }
 
             if (!string.IsNullOrWhiteSpace(appointment.Notes))
             {

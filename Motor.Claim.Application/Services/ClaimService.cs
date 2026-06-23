@@ -11,8 +11,18 @@ namespace Motor.Claim.Application.Services
     public class ClaimService
     {
         private const int RepeatClaimManualReviewWindowDays = 30;
+        private static readonly HashSet<string> WithdrawableStatuses = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Pending",
+            "Pending Manual Review",
+            "Pending Customer Action",
+            "Customer Responded",
+            "Approved"
+        };
+
         private readonly IClaimRepository _claimRepository;
         private readonly ICoverageRepository _coverageRepository;
+        private readonly IWorkshopAppointmentRepository _workshopAppointmentRepository;
         private readonly StpValidationService _stpValidationService;
         private readonly IUserRepository _userRepository;
         private readonly IEmailNotificationService _emailNotificationService;
@@ -20,12 +30,14 @@ namespace Motor.Claim.Application.Services
         public ClaimService(
             IClaimRepository claimRepository,
             ICoverageRepository coverageRepository,
+            IWorkshopAppointmentRepository workshopAppointmentRepository,
             StpValidationService stpValidationService,
             IUserRepository userRepository,
             IEmailNotificationService emailNotificationService)
         {
             _claimRepository = claimRepository;
             _coverageRepository = coverageRepository;
+            _workshopAppointmentRepository = workshopAppointmentRepository;
             _stpValidationService = stpValidationService;
             _userRepository = userRepository;
             _emailNotificationService = emailNotificationService;
@@ -48,6 +60,14 @@ namespace Motor.Claim.Application.Services
             if (command.IncidentDate.Date < coverage.EffectiveDate.Date || command.IncidentDate.Date > coverage.ExpiryDate.Date)
             {
                 throw new ArgumentException("Incident date must be between the coverage effective date and expiry date.");
+            }
+
+            ValidateClaimTypeCoverage(command, coverage);
+
+            var hasActiveClaimForCoverage = await _claimRepository.HasActiveClaimForCoverageAsync(command.CoverageId);
+            if (hasActiveClaimForCoverage)
+            {
+                throw new ArgumentException("This coverage already has an active claim. Wait until it is approved or rejected before submitting another claim.");
             }
 
             ValidateDocuments(command);
@@ -127,6 +147,7 @@ namespace Motor.Claim.Application.Services
         public async Task<ClaimEntity> ApproveAsync(Guid claimId, Guid officerUserId, string? note)
         {
             var claim = await GetExistingClaimAsync(claimId);
+            EnsureClaimIsNotWithdrawn(claim);
             claim.Status = "Approved";
             claim.ReviewStatus = "Approved";
             claim.OfficerDecisionNote = note;
@@ -148,6 +169,7 @@ namespace Motor.Claim.Application.Services
         public async Task<ClaimEntity> RejectAsync(Guid claimId, Guid officerUserId, string? note)
         {
             var claim = await GetExistingClaimAsync(claimId);
+            EnsureClaimIsNotWithdrawn(claim);
             claim.Status = "Rejected";
             claim.ReviewStatus = "Rejected";
             claim.OfficerDecisionNote = note;
@@ -174,6 +196,7 @@ namespace Motor.Claim.Application.Services
             }
 
             var claim = await GetExistingClaimAsync(claimId);
+            EnsureClaimIsNotWithdrawn(claim);
             claim.Status = "Pending Customer Action";
             claim.ReviewStatus = "PendingCustomerAction";
             claim.RequestedItems = requestedItems;
@@ -197,6 +220,7 @@ namespace Motor.Claim.Application.Services
         public async Task<ClaimEntity> SubmitCustomerResponseAsync(Guid claimId, Guid userId, string? responseNote, List<string> responseDocuments)
         {
             var claim = await GetExistingClaimAsync(claimId);
+            EnsureClaimIsNotWithdrawn(claim);
 
             if (claim.UserId != userId)
             {
@@ -221,15 +245,77 @@ namespace Motor.Claim.Application.Services
             return claim;
         }
 
+        public async Task<ClaimEntity> WithdrawAsync(Guid claimId, Guid userId, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new ArgumentException("Withdrawal reason is required.");
+            }
+
+            var claim = await _claimRepository.GetByIdWithDetailsAsync(claimId);
+            if (claim == null)
+            {
+                throw new ArgumentException("Claim not found.");
+            }
+
+            if (claim.UserId != userId)
+            {
+                throw new ArgumentException("You are not allowed to withdraw this claim.");
+            }
+
+            if (!WithdrawableStatuses.Contains(claim.Status))
+            {
+                throw new ArgumentException($"A claim with status '{claim.Status}' cannot be withdrawn.");
+            }
+
+            if (claim.WorkshopRepairEstimate != null || claim.WorkshopPayment != null)
+            {
+                throw new ArgumentException("This claim cannot be withdrawn because the workshop has already submitted a quotation.");
+            }
+
+            var withdrawnAt = DateTime.UtcNow;
+            if (claim.WorkshopAppointment != null)
+            {
+                claim.WorkshopAppointment.Status = "Cancelled";
+                await _workshopAppointmentRepository.UpdateAsync(claim.WorkshopAppointment);
+            }
+
+            claim.Status = "Withdrawn";
+            claim.ReviewStatus = "Withdrawn";
+            claim.IsSTPApproved = false;
+            claim.WithdrawnAt = withdrawnAt;
+            claim.WithdrawalReason = reason.Trim();
+            claim.DecidedAt = withdrawnAt;
+
+            await _claimRepository.UpdateAsync(claim);
+            await NotifyCustomerAsync(
+                claim,
+                "Your motor claim has been withdrawn",
+                BuildClaimStatusEmailBody(
+                    claim,
+                    "Your claim has been withdrawn successfully.",
+                    claim.WithdrawalReason,
+                    claim.WorkshopAppointment == null
+                        ? "No further processing will take place for this claim."
+                        : "Your panel workshop booking has also been cancelled."));
+            return claim;
+        }
+
         private static void ValidateDocuments(CreateClaimCommand command)
         {
             var missingDocuments = new List<string>();
 
-            AddIfMissing(missingDocuments, command.PoliceReportDocument, nameof(command.PoliceReportDocument));
             AddIfMissing(missingDocuments, command.IdentityDocumentFront, nameof(command.IdentityDocumentFront));
 
             if (command.AllClaimType != AllClaimType.VehicleClaim)
             {
+                AddIfMissing(missingDocuments, command.PoliceReportDocument, nameof(command.PoliceReportDocument));
+
+                if (missingDocuments.Count > 0)
+                {
+                    throw new ArgumentException($"Missing required document(s): {string.Join(", ", missingDocuments)}");
+                }
+
                 return;
             }
 
@@ -238,10 +324,35 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("MotorClaimType is required when AllClaimType is VehicleClaim.");
             }
 
-            if (command.MotorClaimType == MotorClaimType.VehicleDamages)
+            if (command.MotorClaimType != MotorClaimType.Windscreen)
+            {
+                AddIfMissing(missingDocuments, command.PoliceReportDocument, nameof(command.PoliceReportDocument));
+            }
+
+            if (command.MotorClaimType == MotorClaimType.VehicleDamages ||
+                command.MotorClaimType == MotorClaimType.Windscreen)
             {
                 AddIfMissing(missingDocuments, command.VehicleOwnershipCertificateDocument, nameof(command.VehicleOwnershipCertificateDocument));
                 AddIfMissing(missingDocuments, command.DrivingLicenseFront, nameof(command.DrivingLicenseFront));
+            }
+
+            if (command.MotorClaimType == MotorClaimType.VehicleDamages)
+            {
+                AddIfMissing(missingDocuments, command.VehicleDamageFrontLeftDocument, nameof(command.VehicleDamageFrontLeftDocument));
+                AddIfMissing(missingDocuments, command.VehicleDamageFrontRightDocument, nameof(command.VehicleDamageFrontRightDocument));
+                AddIfMissing(missingDocuments, command.VehicleDamageRearLeftDocument, nameof(command.VehicleDamageRearLeftDocument));
+                AddIfMissing(missingDocuments, command.VehicleDamageRearRightDocument, nameof(command.VehicleDamageRearRightDocument));
+            }
+
+            if (command.MotorClaimType == MotorClaimType.Windscreen)
+            {
+                AddIfMissing(missingDocuments, command.IdentityDocumentBack, nameof(command.IdentityDocumentBack));
+                AddIfMissing(missingDocuments, command.DrivingLicenseBack, nameof(command.DrivingLicenseBack));
+
+                if (!HasAnyDamagePhoto(command))
+                {
+                    missingDocuments.Add("At least one windscreen damage photo");
+                }
             }
 
             if (missingDocuments.Count > 0)
@@ -255,6 +366,42 @@ namespace Motor.Claim.Application.Services
             if (string.IsNullOrWhiteSpace(value))
             {
                 missingDocuments.Add(fieldName);
+            }
+        }
+
+        private static bool HasAnyDamagePhoto(CreateClaimCommand command)
+        {
+            return !string.IsNullOrWhiteSpace(command.VehicleDamageFrontLeftDocument) ||
+                   !string.IsNullOrWhiteSpace(command.VehicleDamageFrontRightDocument) ||
+                   !string.IsNullOrWhiteSpace(command.VehicleDamageRearLeftDocument) ||
+                   !string.IsNullOrWhiteSpace(command.VehicleDamageRearRightDocument);
+        }
+
+        private static void ValidateClaimTypeCoverage(CreateClaimCommand command, CoverageEntity coverage)
+        {
+            if (command.AllClaimType != AllClaimType.VehicleClaim || !command.MotorClaimType.HasValue)
+            {
+                return;
+            }
+
+            if (command.MotorClaimType == MotorClaimType.Windscreen &&
+                coverage.WindscreenRemainingCoverageAmount <= 0m)
+            {
+                throw new ArgumentException("The selected coverage has no remaining windscreen coverage amount.");
+            }
+
+            if (command.MotorClaimType != MotorClaimType.Windscreen &&
+                coverage.RemainingCoverageAmount <= 0m)
+            {
+                throw new ArgumentException("The selected coverage has no remaining comprehensive coverage amount.");
+            }
+        }
+
+        private static void EnsureClaimIsNotWithdrawn(ClaimEntity claim)
+        {
+            if (string.Equals(claim.Status, "Withdrawn", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("A withdrawn claim cannot be processed further.");
             }
         }
 

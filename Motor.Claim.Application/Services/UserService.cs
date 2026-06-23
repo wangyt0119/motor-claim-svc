@@ -105,7 +105,7 @@ namespace Motor.Claim.Application.Services
 
             var user = new UserEntity
             {
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 UserId = Guid.NewGuid(),
                 FullName = request.FullName,
                 IdType = request.IdType,

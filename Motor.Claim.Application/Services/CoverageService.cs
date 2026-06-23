@@ -42,7 +42,7 @@ namespace Motor.Claim.Application.Services
 
             var coverage = new CoverageEntity
             {
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 CoverageId = Guid.NewGuid(),
                 UserId = command.UserId,
                 InsuredPersonName = command.InsuredPersonName,

@@ -78,6 +78,20 @@ builder.Services.AddScoped<GetWorkshopAppointmentByClaimQueryHandler>();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
+var configuredCorsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?? Array.Empty<string>();
+
+var allowedCorsOrigins = new HashSet<string>(
+    configuredCorsOrigins
+        .Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .Select(origin => origin.Trim().TrimEnd('/')),
+    StringComparer.OrdinalIgnoreCase)
+{
+    "http://localhost:3000",
+    "https://motor-claim-web.vercel.app"
+};
 
 builder.Services.AddAuthentication(options =>
 {
@@ -121,13 +135,16 @@ builder.Services.AddCors(options =>
         policy
             .SetIsOriginAllowed(origin =>
             {
+                origin = origin.TrimEnd('/');
+                if (allowedCorsOrigins.Contains(origin))
+                    return true;
+
                 if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
                     return false;
 
                 var host = uri.Host;
 
-                return host == "localhost" ||
-                       host == "motor-claim-web.vercel.app" ||
+                return uri.Scheme == "http" && host == "localhost" ||
                        host.EndsWith("-wangyt0119s-projects.vercel.app");
             })
             .AllowAnyHeader()

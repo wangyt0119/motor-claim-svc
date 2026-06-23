@@ -64,7 +64,8 @@ namespace Motor.Claim.WebApi.Services
                 using var client = new SmtpClient(_options.Host, _options.Port)
                 {
                     EnableSsl = _options.EnableSsl,
-                    Credentials = new NetworkCredential(_options.Username, _options.Password)
+                    Credentials = new NetworkCredential(_options.Username, _options.Password),
+                    Timeout = 5000
                 };
 
                 await client.SendMailAsync(message);

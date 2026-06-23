@@ -9,6 +9,13 @@ namespace Motor.Claim.Application.Services
     public class WorkshopRepairEstimateService
     {
         private const decimal StpAmountThreshold = 2000m;
+        private static readonly HashSet<string> AllowedDocumentExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".pdf"
+        };
         private readonly IWorkshopRepairEstimateRepository _estimateRepository;
         private readonly IClaimRepository _claimRepository;
         private readonly IWorkshopPaymentRepository _paymentRepository;
@@ -63,9 +70,15 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Receipt or quotation document is required.");
             }
 
-            if (request.TotalAmount < 0)
+            if (!IsAllowedQuotationDocument(request.ReceiptOrQuotationDocument) ||
+                request.SupportingDocuments.Any(document => !IsAllowedQuotationDocument(document)))
             {
-                throw new ArgumentException("Total amount cannot be negative.");
+                throw new ArgumentException("Only PNG, JPG, JPEG, or PDF files are accepted for workshop quotation documents.");
+            }
+
+            if (request.TotalAmount <= 0)
+            {
+                throw new ArgumentException("Total amount must be greater than 0.");
             }
 
             var existing = await _estimateRepository.GetByClaimIdAsync(request.ClaimId);
@@ -213,6 +226,22 @@ namespace Motor.Claim.Application.Services
                 estimate.ReviewedByUserId = null;
                 estimate.ReviewedAt = null;
             }
+        }
+
+        private static bool IsAllowedQuotationDocument(string? documentUrl)
+        {
+            if (string.IsNullOrWhiteSpace(documentUrl))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(documentUrl, UriKind.Absolute, out var uri))
+            {
+                return false;
+            }
+
+            var extension = Path.GetExtension(uri.AbsolutePath);
+            return AllowedDocumentExtensions.Contains(extension);
         }
 
         private static void ApplyCoverageSplit(WorkshopRepairEstimateEntity estimate, CoverageEntity coverage)

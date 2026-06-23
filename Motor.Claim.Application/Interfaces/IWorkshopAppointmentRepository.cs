@@ -11,5 +11,9 @@ namespace Motor.Claim.Application.Interfaces
             TimeSpan timeSlotStart,
             TimeSpan timeSlotEnd,
             Guid? excludedClaimId = null);
+        Task<List<WorkshopAppointmentEntity>> GetScheduledSlotsAsync(
+            Guid workshopId,
+            DateTime preferredDate,
+            Guid? excludedClaimId = null);
     }
 }

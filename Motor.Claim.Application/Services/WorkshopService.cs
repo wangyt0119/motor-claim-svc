@@ -141,7 +141,9 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Workshop booking is only available for vehicle claims.");
             }
 
-            var isOfficerApproved = string.Equals(claim.ReviewStatus, "Approved", StringComparison.OrdinalIgnoreCase);
+            var isOfficerApproved =
+                string.Equals(claim.ReviewStatus, "Approved", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(claim.Status, "Approved", StringComparison.OrdinalIgnoreCase);
             var isStpApproved = claim.STPStatus == StpStatus.AutoApproved || claim.IsSTPApproved;
 
             if (!isOfficerApproved && !isStpApproved)
@@ -244,7 +246,9 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("Workshop assignment is only available for vehicle claims.");
             }
 
-            var isOfficerApproved = string.Equals(claim.ReviewStatus, "Approved", StringComparison.OrdinalIgnoreCase);
+            var isOfficerApproved =
+                string.Equals(claim.ReviewStatus, "Approved", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(claim.Status, "Approved", StringComparison.OrdinalIgnoreCase);
             var isStpApproved = claim.STPStatus == StpStatus.AutoApproved || claim.IsSTPApproved;
             if (!isOfficerApproved && !isStpApproved)
             {
@@ -326,6 +330,31 @@ namespace Motor.Claim.Application.Services
 
             var appointment = await _workshopAppointmentRepository.GetByClaimIdAsync(claimId);
             return appointment == null ? null : MapAppointmentResponse(appointment);
+        }
+
+        public async Task<List<WorkshopBookedSlotResponse>> GetBookedSlotsAsync(
+            Guid workshopId,
+            DateTime preferredDate,
+            Guid? excludedClaimId = null)
+        {
+            var workshop = await _workshopRepository.GetByIdAsync(workshopId);
+            if (workshop == null || !workshop.IsActive || !workshop.IsPanelWorkshop)
+            {
+                throw new ArgumentException("Selected workshop is not an active panel workshop.");
+            }
+
+            var slots = await _workshopAppointmentRepository.GetScheduledSlotsAsync(
+                workshopId,
+                preferredDate,
+                excludedClaimId);
+
+            return slots
+                .Select(slot => new WorkshopBookedSlotResponse
+                {
+                    TimeSlotStart = slot.TimeSlotStart,
+                    TimeSlotEnd = slot.TimeSlotEnd
+                })
+                .ToList();
         }
 
         public async Task<WorkshopResponse> GetMyWorkshopAsync(Guid workshopId)

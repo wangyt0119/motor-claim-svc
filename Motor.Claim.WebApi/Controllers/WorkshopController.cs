@@ -384,6 +384,25 @@ namespace Motor.Claim.API.Controllers
             }
         }
 
+        [HttpGet("appointments/booked-slots")]
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> GetBookedSlots(
+            [FromServices] WorkshopService workshopService,
+            [FromQuery] Guid workshopId,
+            [FromQuery] DateTime preferredDate,
+            [FromQuery] Guid? excludedClaimId)
+        {
+            try
+            {
+                var result = await workshopService.GetBookedSlotsAsync(workshopId, preferredDate, excludedClaimId);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("panel-workshop/approved-claims")]
         [Authorize(Policy = "PanelWorkshopOnly")]
         public async Task<IActionResult> GetApprovedClaimsForPanelWorkshop()

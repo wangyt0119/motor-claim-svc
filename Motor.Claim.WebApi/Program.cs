@@ -22,7 +22,38 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    var databaseProvider = builder.Configuration["Database:Provider"];
+    if (string.IsNullOrWhiteSpace(databaseProvider))
+    {
+        databaseProvider = builder.Environment.IsDevelopment()
+            ? "SqlServer"
+            : "Postgres";
+    }
+
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
+    }
+
+    if (databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
+        || databaseProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseNpgsql(connectionString);
+        return;
+    }
+
+    if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase)
+        || databaseProvider.Equals("MSSQL", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString);
+        return;
+    }
+
+    throw new InvalidOperationException(
+        $"Unsupported database provider '{databaseProvider}'. Use 'SqlServer' or 'Postgres'.");
+});
 
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Payments:Stripe"));
 builder.Services.Configure<SmtpEmailOptions>(builder.Configuration.GetSection("Notifications:Smtp"));

@@ -119,12 +119,17 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins(
-                "http://localhost:3000",
-                "https://motor-claim-web.vercel.app",
-                "https://motor-claim-4mggowkd6-wangyt0119s-projects.vercel.app",
-                "https://motor-claim-52avlyl6m-wangyt0119s-projects.vercel.app"
-            )
+            .SetIsOriginAllowed(origin =>
+            {
+                if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                    return false;
+
+                var host = uri.Host;
+
+                return host == "localhost" ||
+                       host == "motor-claim-web.vercel.app" ||
+                       host.EndsWith("-wangyt0119s-projects.vercel.app");
+            })
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -145,7 +150,7 @@ app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
-app.UseMiddleware<SystemActivityLoggingMiddleware>();
+//app.UseMiddleware<SystemActivityLoggingMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

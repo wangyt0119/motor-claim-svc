@@ -120,9 +120,11 @@ builder.Services.AddCors(options =>
     {
         policy
             .WithOrigins(
-            "http://localhost:3000",
-            "https://motor-claim-web.vercel.app",
-            "https://motor-claim-52avlyl6m-wangyt0119s-projects.vercel.app")
+                "http://localhost:3000",
+                "https://motor-claim-web.vercel.app",
+                "https://motor-claim-4mggowkd6-wangyt0119s-projects.vercel.app",
+                "https://motor-claim-52avlyl6m-wangyt0119s-projects.vercel.app"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod();
     });

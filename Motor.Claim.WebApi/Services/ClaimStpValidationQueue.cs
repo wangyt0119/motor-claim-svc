@@ -5,7 +5,7 @@ namespace Motor.Claim.WebApi.Services
     public interface IClaimStpValidationQueue
     {
         ValueTask QueueAsync(Guid claimId);
-        ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken);
+        ValueTask<Guid?> DequeueAsync(TimeSpan timeout, CancellationToken cancellationToken);
     }
 
     public class ClaimStpValidationQueue : IClaimStpValidationQueue
@@ -22,9 +22,19 @@ namespace Motor.Claim.WebApi.Services
             return _queue.Writer.WriteAsync(claimId);
         }
 
-        public ValueTask<Guid> DequeueAsync(CancellationToken cancellationToken)
+        public async ValueTask<Guid?> DequeueAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            return _queue.Reader.ReadAsync(cancellationToken);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(timeout);
+
+            try
+            {
+                return await _queue.Reader.ReadAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
         }
     }
 }

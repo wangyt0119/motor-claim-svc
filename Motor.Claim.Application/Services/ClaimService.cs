@@ -12,6 +12,7 @@ namespace Motor.Claim.Application.Services
     public class ClaimService
     {
         private const int RepeatClaimManualReviewWindowDays = 30;
+        private static readonly TimeSpan NotificationWaitTimeout = TimeSpan.FromSeconds(3);
         private static readonly HashSet<string> WithdrawableStatuses = new(StringComparer.OrdinalIgnoreCase)
         {
             "Pending",
@@ -530,10 +531,20 @@ namespace Motor.Claim.Application.Services
                 return;
             }
 
-            var result = await _emailNotificationService.SendDiagnosticAsync(
+            var sendTask = _emailNotificationService.SendDiagnosticAsync(
                 customer.Email,
                 subject,
                 WrapEmail(customer.FullName, htmlBody));
+
+            var completedTask = await Task.WhenAny(sendTask, Task.Delay(NotificationWaitTimeout));
+            if (completedTask != sendTask)
+            {
+                claim.EmailNotificationSent = false;
+                claim.EmailNotificationMessage = "Email sending is still running in the background. Claim status was updated successfully.";
+                return;
+            }
+
+            var result = await sendTask;
 
             claim.EmailNotificationSent = result.Success;
             claim.EmailNotificationMessage = result.Message;

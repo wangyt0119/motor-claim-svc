@@ -65,7 +65,7 @@ namespace Motor.Claim.WebApi.Services
                 {
                     EnableSsl = _options.EnableSsl,
                     Credentials = new NetworkCredential(_options.Username, _options.Password),
-                    Timeout = 20000
+                    Timeout = 8000
                 };
 
                 await client.SendMailAsync(message);
@@ -74,11 +74,19 @@ namespace Motor.Claim.WebApi.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send notification email to {Email}.", toEmail);
+                var errorMessage = GetDetailedErrorMessage(ex);
+                _logger.LogError(
+                    ex,
+                    "Failed to send notification email to {Email} using SMTP {Host}:{Port} SSL={EnableSsl}. {ErrorMessage}",
+                    toEmail,
+                    _options.Host,
+                    _options.Port,
+                    _options.EnableSsl,
+                    errorMessage);
 
                 if (!swallowException)
                 {
-                    return (false, ex.Message);
+                    return (false, errorMessage);
                 }
             }
 
@@ -91,6 +99,20 @@ namespace Motor.Claim.WebApi.Services
                 && !string.IsNullOrWhiteSpace(_options.Username)
                 && !string.IsNullOrWhiteSpace(_options.Password)
                 && !string.IsNullOrWhiteSpace(_options.FromEmail);
+        }
+
+        private static string GetDetailedErrorMessage(Exception exception)
+        {
+            var messages = new List<string>();
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (!string.IsNullOrWhiteSpace(current.Message))
+                {
+                    messages.Add(current.Message);
+                }
+            }
+
+            return string.Join(" | ", messages.Distinct());
         }
     }
 }

@@ -27,6 +27,14 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<CoverageEntity>> GetBasicByUserIdAsync(Guid userId)
+        {
+            return await _context.Coverages
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .ToListAsync();
+        }
+
         public async Task<List<CoverageEntity>> GetAllWithClaimsAsync()
         {
             return await _context.Coverages

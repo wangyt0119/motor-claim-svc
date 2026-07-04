@@ -73,6 +73,8 @@ builder.Services.AddScoped<ISystemActivityLogRepository, SystemActivityLogReposi
 builder.Services.AddScoped<IWorkshopPaymentProviderResolver, WorkshopPaymentProviderResolver>();
 builder.Services.AddScoped<IEmailNotificationService, SmtpEmailNotificationService>();
 builder.Services.AddHttpClient<IGeminiDamageAssessmentService, GeminiDamageAssessmentService>();
+builder.Services.AddSingleton<IClaimStpValidationQueue, ClaimStpValidationQueue>();
+builder.Services.AddHostedService<ClaimStpValidationBackgroundService>();
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<CoverageService>();

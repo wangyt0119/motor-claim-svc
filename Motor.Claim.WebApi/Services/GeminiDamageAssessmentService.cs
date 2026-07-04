@@ -15,6 +15,8 @@ namespace Motor.Claim.WebApi.Services
     public class GeminiDamageAssessmentService : IGeminiDamageAssessmentService
     {
         private const int MaxAttempts = 4;
+        private const int MaxOutputTokens = 4096;
+        private const int RetryMaxOutputTokens = 3072;
 
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
         {
@@ -42,8 +44,62 @@ namespace Motor.Claim.WebApi.Services
                 throw new ArgumentException("Image is required.");
             }
 
-            var prompt = BuildPrompt(input.Coverage, input.CustomerMessage);
-            var request = new GeminiGenerateContentRequest
+            var imageBase64 = Convert.ToBase64String(input.ImageBytes);
+            var request = BuildRequest(
+                imageBase64,
+                input.ImageMimeType,
+                BuildPrompt(input.Coverage, input.CustomerMessage),
+                MaxOutputTokens);
+
+            using var response = await SendWithRetryAsync(request, cancellationToken);
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new GeminiDamageAssessmentException(response.StatusCode, responseBody);
+            }
+
+            var responseText = ExtractResponseText(responseBody);
+            if (!TryDeserializePayload(responseText, out var payload))
+            {
+                payload = await RetryWithCompactPromptAsync(input, imageBase64, cancellationToken);
+            }
+
+            return MapResponse(payload, responseText, input.Coverage);
+        }
+
+        private async Task<GeminiDamageAssessmentPayload> RetryWithCompactPromptAsync(
+            GeminiDamageAssessmentInput input,
+            string imageBase64,
+            CancellationToken cancellationToken)
+        {
+            var request = BuildRequest(
+                imageBase64,
+                input.ImageMimeType,
+                BuildCompactPrompt(input.Coverage, input.CustomerMessage),
+                RetryMaxOutputTokens);
+
+            using var response = await SendWithRetryAsync(request, cancellationToken);
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new GeminiDamageAssessmentException(response.StatusCode, responseBody);
+            }
+
+            var responseText = ExtractResponseText(responseBody);
+            return TryDeserializePayload(responseText, out var payload)
+                ? payload
+                : BuildIncompleteResponsePayload();
+        }
+
+        private static GeminiGenerateContentRequest BuildRequest(
+            string imageBase64,
+            string imageMimeType,
+            string prompt,
+            int maxOutputTokens)
+        {
+            return new GeminiGenerateContentRequest
             {
                 Contents = new List<GeminiContent>
                 {
@@ -56,8 +112,8 @@ namespace Motor.Claim.WebApi.Services
                             {
                                 InlineData = new GeminiInlineData
                                 {
-                                    MimeType = input.ImageMimeType,
-                                    Data = Convert.ToBase64String(input.ImageBytes)
+                                    MimeType = imageMimeType,
+                                    Data = imageBase64
                                 }
                             },
                             new()
@@ -70,22 +126,10 @@ namespace Motor.Claim.WebApi.Services
                 GenerationConfig = new GeminiGenerationConfig
                 {
                     Temperature = 0.2m,
+                    MaxOutputTokens = maxOutputTokens,
                     ResponseMimeType = "application/json"
                 }
             };
-
-            using var response = await SendWithRetryAsync(request, cancellationToken);
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new GeminiDamageAssessmentException(response.StatusCode, responseBody);
-            }
-
-            var responseText = ExtractResponseText(responseBody);
-            var payload = DeserializePayload(responseText);
-
-            return MapResponse(payload, responseText, input.Coverage);
         }
 
         private async Task<HttpResponseMessage> SendWithRetryAsync(
@@ -182,6 +226,41 @@ namespace Motor.Claim.WebApi.Services
                 """;
         }
 
+        private static string BuildCompactPrompt(CoverageEntity coverage, string? customerMessage)
+        {
+            return $$"""
+                Analyze the car damage image for a Malaysia motor insurance preliminary quotation.
+                Return compact valid JSON only.
+
+                Vehicle: {{coverage.Year}} {{coverage.VehicleMake}} {{coverage.VehicleModel}} {{coverage.ModelType}}
+                Remaining coverage MYR: {{coverage.RemainingCoverageAmount.ToString("0.00", CultureInfo.InvariantCulture)}}
+                Customer message: {{(string.IsNullOrWhiteSpace(customerMessage) ? "None" : customerMessage)}}
+
+                JSON shape:
+                {
+                  "damageSummary": "max 12 words",
+                  "severity": "Minor|Moderate|Severe|Unknown",
+                  "estimatedRepairCost": 0,
+                  "confidenceScore": 0.0,
+                  "detectedDamageAreas": ["area"],
+                  "lineItems": [
+                    {
+                      "area": "area",
+                      "damageType": "type",
+                      "recommendedRepair": "repair",
+                      "estimatedCost": 0
+                    }
+                  ],
+                  "safetyNotes": ["max 1 note"],
+                  "disclaimer": "Preliminary AI estimate only."
+                }
+
+                Rules: max 3 detectedDamageAreas, max 3 lineItems, max 2 safetyNotes.
+                Keep costs realistic and conservative. Avoid Severe unless major damage is clearly visible.
+                If no clear car damage is visible, use severity "Unknown" and estimatedRepairCost 0.
+                """;
+        }
+
         private static string ExtractResponseText(string responseBody)
         {
             using var document = JsonDocument.Parse(responseBody);
@@ -202,9 +281,10 @@ namespace Motor.Claim.WebApi.Services
             return string.Join(Environment.NewLine, textParts).Trim();
         }
 
-        private static GeminiDamageAssessmentPayload DeserializePayload(string responseText)
+        private static bool TryDeserializePayload(string responseText, out GeminiDamageAssessmentPayload payload)
         {
-            var cleaned = responseText.Trim();
+            payload = new GeminiDamageAssessmentPayload();
+            var cleaned = ExtractJsonObject(responseText);
             if (cleaned.StartsWith("```", StringComparison.Ordinal))
             {
                 cleaned = cleaned.Trim('`').Trim();
@@ -214,8 +294,46 @@ namespace Motor.Claim.WebApi.Services
                 }
             }
 
-            return JsonSerializer.Deserialize<GeminiDamageAssessmentPayload>(cleaned, JsonOptions)
-                ?? new GeminiDamageAssessmentPayload();
+            try
+            {
+                payload = JsonSerializer.Deserialize<GeminiDamageAssessmentPayload>(cleaned, JsonOptions)
+                    ?? new GeminiDamageAssessmentPayload();
+                return true;
+            }
+            catch (JsonException)
+            {
+                payload = BuildIncompleteResponsePayload();
+                return false;
+            }
+        }
+
+        private static string ExtractJsonObject(string responseText)
+        {
+            var cleaned = responseText.Trim();
+            var start = cleaned.IndexOf('{');
+            var end = cleaned.LastIndexOf('}');
+
+            return start >= 0 && end > start
+                ? cleaned[start..(end + 1)]
+                : cleaned;
+        }
+
+        private static GeminiDamageAssessmentPayload BuildIncompleteResponsePayload()
+        {
+            return new GeminiDamageAssessmentPayload
+            {
+                DamageSummary = "AI response was incomplete. Please retry the assessment.",
+                Severity = "Unknown",
+                EstimatedRepairCost = 0m,
+                ConfidenceScore = 0m,
+                DetectedDamageAreas = new List<string>(),
+                LineItems = new List<GeminiDamageAssessmentLineItemPayload>(),
+                SafetyNotes = new List<string>
+                {
+                    "Assessment could not be completed from the AI response."
+                },
+                Disclaimer = "Retry or request workshop review."
+            };
         }
 
         private static DamageAssessmentResponse MapResponse(
@@ -352,6 +470,9 @@ namespace Motor.Claim.WebApi.Services
         {
             [JsonPropertyName("temperature")]
             public decimal Temperature { get; set; }
+
+            [JsonPropertyName("maxOutputTokens")]
+            public int MaxOutputTokens { get; set; } = GeminiDamageAssessmentService.MaxOutputTokens;
 
             [JsonPropertyName("responseMimeType")]
             public string ResponseMimeType { get; set; } = "application/json";

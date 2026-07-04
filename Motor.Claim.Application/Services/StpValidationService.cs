@@ -49,32 +49,46 @@ namespace Motor.Claim.Application.Services
             var policeDiagnostic = CreateDocumentDiagnostic("Police report", claim.PoliceReportDocument);
             var licenseDiagnostic = CreateDocumentDiagnostic("Driving license", claim.DrivingLicenseFront);
 
-            if (HasValue(claim.IdentityDocumentFront))
+            var identityTask = HasValue(claim.IdentityDocumentFront)
+                ? _ocrExtractor.ExtractIdentityDocumentAsync(claim.IdentityDocumentFront!, claim.IdentityDocumentBack)
+                : null;
+            var vehicleOwnershipTask = HasValue(claim.VehicleOwnershipCertificateDocument)
+                ? _ocrExtractor.ExtractVehicleOwnershipCertificateAsync(claim.VehicleOwnershipCertificateDocument!)
+                : null;
+            var policeReportTask = HasValue(claim.PoliceReportDocument)
+                ? _ocrExtractor.ExtractPoliceReportAsync(claim.PoliceReportDocument!)
+                : null;
+            var drivingLicenseTask = HasValue(claim.DrivingLicenseFront)
+                ? _ocrExtractor.ExtractDrivingLicenseAsync(claim.DrivingLicenseFront!, claim.DrivingLicenseBack)
+                : null;
+
+            await Task.WhenAll(GetPendingOcrTasks(
+                identityTask,
+                vehicleOwnershipTask,
+                policeReportTask,
+                drivingLicenseTask));
+
+            if (identityTask != null)
             {
-                identity = await _ocrExtractor.ExtractIdentityDocumentAsync(
-                    claim.IdentityDocumentFront!,
-                    claim.IdentityDocumentBack);
+                identity = await identityTask;
                 EvaluateExtraction(result, identity, identityDiagnostic);
             }
 
-            if (HasValue(claim.VehicleOwnershipCertificateDocument))
+            if (vehicleOwnershipTask != null)
             {
-                vehicleOwnership = await _ocrExtractor.ExtractVehicleOwnershipCertificateAsync(
-                    claim.VehicleOwnershipCertificateDocument!);
+                vehicleOwnership = await vehicleOwnershipTask;
                 EvaluateExtraction(result, vehicleOwnership, vehicleDiagnostic);
             }
 
-            if (HasValue(claim.PoliceReportDocument))
+            if (policeReportTask != null)
             {
-                policeReport = await _ocrExtractor.ExtractPoliceReportAsync(claim.PoliceReportDocument!);
+                policeReport = await policeReportTask;
                 EvaluateExtraction(result, policeReport, policeDiagnostic);
             }
 
-            if (HasValue(claim.DrivingLicenseFront))
+            if (drivingLicenseTask != null)
             {
-                drivingLicense = await _ocrExtractor.ExtractDrivingLicenseAsync(
-                    claim.DrivingLicenseFront!,
-                    claim.DrivingLicenseBack);
+                drivingLicense = await drivingLicenseTask;
                 EvaluateExtraction(result, drivingLicense, licenseDiagnostic);
             }
 
@@ -317,6 +331,14 @@ namespace Motor.Claim.Application.Services
             {
                 result.Reasons.Add($"{diagnostic.DocumentName} OCR confidence is too low.");
             }
+        }
+
+        private static Task<OcrExtractionResult>[] GetPendingOcrTasks(params Task<OcrExtractionResult>?[] tasks)
+        {
+            return tasks
+                .Where(task => task != null)
+                .Cast<Task<OcrExtractionResult>>()
+                .ToArray();
         }
 
         private static OcrDocumentDiagnosticDto CreateDocumentDiagnostic(string documentName, string? documentValue)

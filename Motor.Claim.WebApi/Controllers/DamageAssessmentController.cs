@@ -49,7 +49,12 @@ namespace Motor.Claim.API.Controllers
             }
 
             var userId = GetCurrentUserId();
-            var coverages = await _coverageService.GetByUserIdAsync(userId);
+            var coveragesTask = _coverageService.GetBasicByUserIdAsync(userId);
+            var imageBytesTask = ReadImageBytesAsync(request.Image, cancellationToken);
+
+            await Task.WhenAll(coveragesTask, imageBytesTask);
+
+            var coverages = await coveragesTask;
             var eligibility = FindEligibleCoverage(request, coverages);
 
             if (!eligibility.IsEligible || eligibility.CoverageEntity == null)
@@ -68,13 +73,7 @@ namespace Motor.Claim.API.Controllers
                 });
             }
 
-            byte[] imageBytes;
-            await using (var stream = request.Image.OpenReadStream())
-            using (var memoryStream = new MemoryStream())
-            {
-                await stream.CopyToAsync(memoryStream, cancellationToken);
-                imageBytes = memoryStream.ToArray();
-            }
+            var imageBytes = await imageBytesTask;
 
             try
             {
@@ -127,15 +126,16 @@ namespace Motor.Claim.API.Controllers
                 };
             }
 
-            var today = DateTime.Today;
+            var today = GetMalaysiaToday();
             var activeCoverage = vehicleMatches.FirstOrDefault(x => x.EffectiveDate.Date <= today && x.ExpiryDate.Date >= today);
             if (activeCoverage == null)
             {
+                var nearestCoverage = vehicleMatches.First();
                 return new CoverageEligibilityResult
                 {
                     IsEligible = false,
-                    Message = "The matching coverage is not active today.",
-                    CoverageEntity = vehicleMatches.First()
+                    Message = $"The matching coverage is not active today ({today:yyyy-MM-dd}). Active period: {nearestCoverage.EffectiveDate:yyyy-MM-dd} to {nearestCoverage.ExpiryDate:yyyy-MM-dd}.",
+                    CoverageEntity = nearestCoverage
                 };
             }
 
@@ -162,9 +162,22 @@ namespace Motor.Claim.API.Controllers
             return string.Equals(Normalize(left), Normalize(right), StringComparison.OrdinalIgnoreCase);
         }
 
+        private static async Task<byte[]> ReadImageBytesAsync(IFormFile image, CancellationToken cancellationToken)
+        {
+            await using var stream = image.OpenReadStream();
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream, cancellationToken);
+            return memoryStream.ToArray();
+        }
+
         private static string Normalize(string? value)
         {
             return string.Join(' ', (value ?? string.Empty).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        private static DateTime GetMalaysiaToday()
+        {
+            return DateTime.UtcNow.AddHours(8).Date;
         }
 
         private static CoverageResponse MapCoverage(CoverageEntity coverage)

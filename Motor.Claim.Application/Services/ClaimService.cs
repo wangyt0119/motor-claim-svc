@@ -1,6 +1,7 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
+using Motor.Claim.Application.Dtos.Stp;
 using Motor.Claim.Application.Features.Claim.Commands;
 using Motor.Claim.Application.Interfaces;
 using Motor.Claim.Domain.Entities;
@@ -44,6 +45,12 @@ namespace Motor.Claim.Application.Services
         }
 
         public async Task<ClaimEntity> CreateAsync(CreateClaimCommand command)
+        {
+            var savedClaim = await CreatePendingAsync(command);
+            return await ProcessStpValidationAsync(savedClaim.ClaimId);
+        }
+
+        public async Task<ClaimEntity> CreatePendingAsync(CreateClaimCommand command)
         {
             var coverage = await _coverageRepository.GetByIdAsync(command.CoverageId);
 
@@ -101,19 +108,60 @@ namespace Motor.Claim.Application.Services
                 ManualReviewFlagReason = hasRecentClaimForCoverage
                     ? $"This coverage already has another submitted claim within the last {RepeatClaimManualReviewWindowDays} days."
                     : null,
-                Status = "Pending",
-                ReviewStatus = "Pending"
+                Status = "Processing Validation",
+                ReviewStatus = "ProcessingStpValidation",
+                STPStatus = StpStatus.Pending,
+                IsSTPApproved = false
             };
 
-            var savedClaim = await _claimRepository.AddAsync(claim);
+            return await _claimRepository.AddAsync(claim);
+        }
 
-            var stpResult = await _stpValidationService.ValidateAsync(savedClaim, coverage);
+        public async Task<ClaimEntity> ProcessStpValidationAsync(Guid claimId)
+        {
+            var savedClaim = await _claimRepository.GetByIdWithDetailsAsync(claimId);
+            if (savedClaim == null)
+            {
+                throw new ArgumentException("Claim not found.");
+            }
+
+            if (string.Equals(savedClaim.Status, "Withdrawn", StringComparison.OrdinalIgnoreCase))
+            {
+                return savedClaim;
+            }
+
+            var coverage = savedClaim.Coverage ?? await _coverageRepository.GetByIdAsync(savedClaim.CoverageId);
+            if (coverage == null)
+            {
+                throw new ArgumentException("Coverage not found.");
+            }
+
+            StpValidationResultDto stpResult;
+            try
+            {
+                stpResult = await _stpValidationService.ValidateAsync(savedClaim, coverage);
+            }
+            catch (Exception ex)
+            {
+                savedClaim.STPStatus = StpStatus.ManualReview;
+                savedClaim.IsSTPApproved = false;
+                savedClaim.Status = "Pending Manual Review";
+                savedClaim.ReviewStatus = "PendingManualReview";
+                savedClaim.DecidedAt = null;
+                savedClaim.ManualReviewFlagReason = string.IsNullOrWhiteSpace(savedClaim.ManualReviewFlagReason)
+                    ? $"STP validation could not be completed automatically: {ex.Message}"
+                    : $"{savedClaim.ManualReviewFlagReason} STP validation could not be completed automatically: {ex.Message}";
+
+                await _claimRepository.UpdateAsync(savedClaim);
+                await SendClaimCreatedNotificationAsync(savedClaim, coverage.VehicleNo);
+                return savedClaim;
+            }
 
             savedClaim.STPStatus = stpResult.STPStatus;
             savedClaim.IsSTPApproved = stpResult.IsApproved;
             savedClaim.ValidationResult = StpValidationService.SerializeResult(stpResult);
 
-            if (hasRecentClaimForCoverage)
+            if (savedClaim.IsFlaggedForManualReview)
             {
                 savedClaim.STPStatus = StpStatus.ManualReview;
                 savedClaim.IsSTPApproved = false;

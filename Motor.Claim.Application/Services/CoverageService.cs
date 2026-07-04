@@ -71,6 +71,11 @@ namespace Motor.Claim.Application.Services
             return await _coverageRepository.GetByUserIdAsync(userId);
         }
 
+        public async Task<List<CoverageEntity>> GetBasicByUserIdAsync(Guid userId)
+        {
+            return await _coverageRepository.GetBasicByUserIdAsync(userId);
+        }
+
         public async Task<List<CoverageEntity>> GetAllAsync()
         {
             return await _coverageRepository.GetAllWithClaimsAsync();

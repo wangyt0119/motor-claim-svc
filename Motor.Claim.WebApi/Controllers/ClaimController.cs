@@ -6,6 +6,7 @@ using Motor.Claim.Application.Features.Claim.Commands;
 using Motor.Claim.Application.Features.Claim.Queries;
 using Motor.Claim.Application.Dtos.Workshop;
 using Motor.Claim.Application.Services;
+using Motor.Claim.WebApi.Services;
 
 namespace Motor.Claim.API.Controllers
 {
@@ -13,21 +14,21 @@ namespace Motor.Claim.API.Controllers
     [Route("api/[controller]")]
     public class ClaimController : ControllerBase
     {
-        private readonly CreateClaimCommandHandler _createClaimCommandHandler;
         private readonly GetMyClaimsQueryHandler _getMyClaimsQueryHandler;
         private readonly GetAllClaimsQueryHandler _getAllClaimsQueryHandler;
         private readonly ClaimService _claimService;
+        private readonly IClaimStpValidationQueue _stpValidationQueue;
 
         public ClaimController(
-            CreateClaimCommandHandler createClaimCommandHandler,
             GetMyClaimsQueryHandler getMyClaimsQueryHandler,
             GetAllClaimsQueryHandler getAllClaimsQueryHandler,
-            ClaimService claimService)
+            ClaimService claimService,
+            IClaimStpValidationQueue stpValidationQueue)
         {
-            _createClaimCommandHandler = createClaimCommandHandler;
             _getMyClaimsQueryHandler = getMyClaimsQueryHandler;
             _getAllClaimsQueryHandler = getAllClaimsQueryHandler;
             _claimService = claimService;
+            _stpValidationQueue = stpValidationQueue;
         }
 
         [HttpPost]
@@ -58,7 +59,8 @@ namespace Motor.Claim.API.Controllers
                     VehicleDamageRearRightDocument = request.VehicleDamageRearRightDocument
                 };
 
-                var result = await _createClaimCommandHandler.Handle(command);
+                var result = await _claimService.CreatePendingAsync(command);
+                await _stpValidationQueue.QueueAsync(result.ClaimId);
 
                 return Ok(MapResponse(result));
             }

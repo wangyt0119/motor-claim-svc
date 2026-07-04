@@ -11,6 +11,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
     public class AzureDocumentIntelligenceOcrExtractor : IOcrExtractor
     {
         private const string ApiVersion = "2024-11-30";
+        private static readonly TimeSpan MinimumAzureRequestSpacing = TimeSpan.FromSeconds(3);
         private static readonly SemaphoreSlim AzureRequestGate = new(1, 1);
         private static DateTime _lastAzureRequestUtc = DateTime.MinValue;
 
@@ -95,7 +96,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
         {
             try
             {
-                for (var attempt = 0; attempt < 4; attempt++)
+                for (var attempt = 0; attempt < 6; attempt++)
                 {
                     using var request = new HttpRequestMessage(HttpMethod.Post, BuildAnalyzeUri());
                     request.Headers.Add("Ocp-Apim-Subscription-Key", GetApiKey());
@@ -151,8 +152,8 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                 {
                     IsSuccess = false,
                     Confidence = 0m,
-                    ErrorMessage = "Azure OCR analyze request hit rate limits repeatedly (429)."
-                };
+                ErrorMessage = "Azure OCR analyze request hit rate limits repeatedly (429). Please retry later."
+            };
             }
             catch (Exception ex)
             {
@@ -211,7 +212,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                     };
                 }
 
-                await Task.Delay(1500);
+                await Task.Delay(2500);
             }
 
             return new OcrExtractionResult
@@ -476,14 +477,23 @@ namespace Motor.Claim.Infrastructure.Shared.Services
             return score;
         }
 
-        private static int GetRetryDelay(HttpResponseMessage response, int attempt)
+        private static TimeSpan GetRetryDelay(HttpResponseMessage response, int attempt)
         {
             if (response.Headers.RetryAfter?.Delta is { } retryAfter && retryAfter > TimeSpan.Zero)
             {
-                return (int)retryAfter.TotalMilliseconds;
+                return retryAfter;
             }
 
-            return 3000 * (attempt + 1);
+            if (response.Headers.RetryAfter?.Date is { } retryAfterDate)
+            {
+                var delayUntilDate = retryAfterDate.UtcDateTime - DateTime.UtcNow;
+                if (delayUntilDate > TimeSpan.Zero)
+                {
+                    return delayUntilDate;
+                }
+            }
+
+            return TimeSpan.FromSeconds(8 * (attempt + 1));
         }
 
         private async Task<HttpResponseMessage> SendAzureRequestAsync(HttpRequestMessage request)
@@ -492,9 +502,9 @@ namespace Motor.Claim.Infrastructure.Shared.Services
             try
             {
                 var elapsedSinceLastRequest = DateTime.UtcNow - _lastAzureRequestUtc;
-                if (elapsedSinceLastRequest < TimeSpan.FromMilliseconds(750))
+                if (elapsedSinceLastRequest < MinimumAzureRequestSpacing)
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(750) - elapsedSinceLastRequest);
+                    await Task.Delay(MinimumAzureRequestSpacing - elapsedSinceLastRequest);
                 }
 
                 var response = await _httpClient.SendAsync(request);

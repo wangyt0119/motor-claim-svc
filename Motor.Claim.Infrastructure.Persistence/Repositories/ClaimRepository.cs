@@ -66,6 +66,20 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task UpdateStpValidationResultAsync(ClaimEntity claim)
+        {
+            await _context.Claims
+                .Where(x => x.ClaimId == claim.ClaimId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.STPStatus, claim.STPStatus)
+                    .SetProperty(x => x.IsSTPApproved, claim.IsSTPApproved)
+                    .SetProperty(x => x.Status, claim.Status)
+                    .SetProperty(x => x.ReviewStatus, claim.ReviewStatus)
+                    .SetProperty(x => x.DecidedAt, claim.DecidedAt)
+                    .SetProperty(x => x.ManualReviewFlagReason, claim.ManualReviewFlagReason)
+                    .SetProperty(x => x.ValidationResult, claim.ValidationResult));
+        }
+
         public async Task<bool> HasSubmittedClaimForCoverageSinceAsync(Guid coverageId, DateTime submittedSinceUtc)
         {
             return await _context.Claims.AnyAsync(x =>

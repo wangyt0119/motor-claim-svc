@@ -154,7 +154,7 @@ namespace Motor.Claim.Application.Services
                     ? $"STP validation could not be completed automatically: {ex.Message}"
                     : $"{savedClaim.ManualReviewFlagReason} STP validation could not be completed automatically: {ex.Message}";
 
-                await _claimRepository.UpdateAsync(savedClaim);
+                await _claimRepository.UpdateStpValidationResultAsync(savedClaim);
                 await SendClaimCreatedNotificationAsync(savedClaim, coverage.VehicleNo);
                 return savedClaim;
             }
@@ -178,7 +178,7 @@ namespace Motor.Claim.Application.Services
                 savedClaim.DecidedAt = stpResult.IsApproved ? DateTime.UtcNow : null;
             }
 
-            await _claimRepository.UpdateAsync(savedClaim);
+            await _claimRepository.UpdateStpValidationResultAsync(savedClaim);
             await SendClaimCreatedNotificationAsync(savedClaim, coverage.VehicleNo);
 
             return savedClaim;

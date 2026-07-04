@@ -11,6 +11,9 @@ namespace Motor.Claim.Infrastructure.Shared.Services
     public class AzureDocumentIntelligenceOcrExtractor : IOcrExtractor
     {
         private const string ApiVersion = "2024-11-30";
+        private static readonly SemaphoreSlim AzureRequestGate = new(1, 1);
+        private static DateTime _lastAzureRequestUtc = DateTime.MinValue;
+
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
         private readonly MockOcrExtractor _mockOcrExtractor;
@@ -101,7 +104,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                         Encoding.UTF8,
                         "application/json");
 
-                    using var response = await _httpClient.SendAsync(request);
+                    using var response = await SendAzureRequestAsync(request);
                     if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                     {
                         await Task.Delay(GetRetryDelay(response, attempt));
@@ -170,7 +173,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                 request.Headers.Add("Ocp-Apim-Subscription-Key", GetApiKey());
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                using var response = await _httpClient.SendAsync(request);
+                using var response = await SendAzureRequestAsync(request);
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
                     await Task.Delay(GetRetryDelay(response, attempt));
@@ -208,7 +211,7 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                     };
                 }
 
-                await Task.Delay(1000);
+                await Task.Delay(1500);
             }
 
             return new OcrExtractionResult
@@ -480,7 +483,28 @@ namespace Motor.Claim.Infrastructure.Shared.Services
                 return (int)retryAfter.TotalMilliseconds;
             }
 
-            return 1500 * (attempt + 1);
+            return 3000 * (attempt + 1);
+        }
+
+        private async Task<HttpResponseMessage> SendAzureRequestAsync(HttpRequestMessage request)
+        {
+            await AzureRequestGate.WaitAsync();
+            try
+            {
+                var elapsedSinceLastRequest = DateTime.UtcNow - _lastAzureRequestUtc;
+                if (elapsedSinceLastRequest < TimeSpan.FromMilliseconds(750))
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(750) - elapsedSinceLastRequest);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+                _lastAzureRequestUtc = DateTime.UtcNow;
+                return response;
+            }
+            finally
+            {
+                AzureRequestGate.Release();
+            }
         }
 
         private static string BuildAzureErrorMessage(string requestType, HttpResponseMessage response, string payload)

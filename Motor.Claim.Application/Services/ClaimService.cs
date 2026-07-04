@@ -64,7 +64,9 @@ namespace Motor.Claim.Application.Services
                 throw new ArgumentException("You are not allowed to claim this coverage.");
             }
 
-            if (command.IncidentDate.Date < coverage.EffectiveDate.Date || command.IncidentDate.Date > coverage.ExpiryDate.Date)
+            var incidentDateUtc = EnsureUtc(command.IncidentDate);
+
+            if (incidentDateUtc.Date < coverage.EffectiveDate.Date || incidentDateUtc.Date > coverage.ExpiryDate.Date)
             {
                 throw new ArgumentException("Incident date must be between the coverage effective date and expiry date.");
             }
@@ -90,7 +92,7 @@ namespace Motor.Claim.Application.Services
                 ClaimId = Guid.NewGuid(),
                 UserId = command.UserId,
                 CoverageId = command.CoverageId,
-                IncidentDate = command.IncidentDate,
+                IncidentDate = incidentDateUtc,
                 AllClaimType = command.AllClaimType,
                 MotorClaimType = command.MotorClaimType,
                 IncidentDescription = command.IncidentDescription,
@@ -407,6 +409,16 @@ namespace Motor.Claim.Application.Services
             {
                 throw new ArgumentException($"Missing required document(s): {string.Join(", ", missingDocuments)}");
             }
+        }
+
+        private static DateTime EnsureUtc(DateTime value)
+        {
+            return value.Kind switch
+            {
+                DateTimeKind.Utc => value,
+                DateTimeKind.Local => value.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            };
         }
 
         private static void AddIfMissing(List<string> missingDocuments, string? value, string fieldName)

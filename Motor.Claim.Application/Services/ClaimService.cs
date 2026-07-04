@@ -161,7 +161,6 @@ namespace Motor.Claim.Application.Services
 
             savedClaim.STPStatus = stpResult.STPStatus;
             savedClaim.IsSTPApproved = stpResult.IsApproved;
-            savedClaim.ValidationResult = StpValidationService.SerializeResult(stpResult);
 
             if (savedClaim.IsFlaggedForManualReview)
             {
@@ -170,6 +169,7 @@ namespace Motor.Claim.Application.Services
                 savedClaim.Status = "Pending Manual Review";
                 savedClaim.ReviewStatus = "PendingManualReview";
                 savedClaim.DecidedAt = null;
+                stpResult.Reasons.Add(savedClaim.ManualReviewFlagReason ?? "Claim was flagged for manual review.");
             }
             else
             {
@@ -177,6 +177,10 @@ namespace Motor.Claim.Application.Services
                 savedClaim.ReviewStatus = stpResult.IsApproved ? "Approved" : "PendingManualReview";
                 savedClaim.DecidedAt = stpResult.IsApproved ? DateTime.UtcNow : null;
             }
+
+            stpResult.IsApproved = savedClaim.IsSTPApproved;
+            stpResult.STPStatus = savedClaim.STPStatus;
+            savedClaim.ValidationResult = StpValidationService.SerializeResult(stpResult);
 
             await _claimRepository.UpdateStpValidationResultAsync(savedClaim);
             await SendClaimCreatedNotificationAsync(savedClaim, coverage.VehicleNo);
@@ -204,7 +208,7 @@ namespace Motor.Claim.Application.Services
             claim.DecidedAt = DateTime.UtcNow;
             claim.ReviewedByUserId = officerUserId;
 
-            await _claimRepository.UpdateAsync(claim);
+            await _claimRepository.UpdateOfficerDecisionAsync(claim);
             await NotifyCustomerAsync(
                 claim,
                 "Your motor claim has been approved",
@@ -226,7 +230,7 @@ namespace Motor.Claim.Application.Services
             claim.DecidedAt = DateTime.UtcNow;
             claim.ReviewedByUserId = officerUserId;
 
-            await _claimRepository.UpdateAsync(claim);
+            await _claimRepository.UpdateOfficerDecisionAsync(claim);
             await NotifyCustomerAsync(
                 claim,
                 "Your motor claim has been rejected",
@@ -255,7 +259,7 @@ namespace Motor.Claim.Application.Services
             claim.DecidedAt = null;
             claim.ReviewedByUserId = officerUserId;
 
-            await _claimRepository.UpdateAsync(claim);
+            await _claimRepository.UpdateOfficerDecisionAsync(claim);
             await NotifyCustomerAsync(
                 claim,
                 "More information is needed for your claim",

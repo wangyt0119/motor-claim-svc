@@ -10,6 +10,7 @@ namespace Motor.Claim.Application.Interfaces
         Task<List<Guid>> GetPendingStpValidationClaimIdsAsync(int take);
         Task<ClaimEntity?> GetByIdWithDetailsAsync(Guid claimId);
         Task UpdateStpValidationResultAsync(ClaimEntity claim);
+        Task UpdateOfficerDecisionAsync(ClaimEntity claim);
         Task<bool> HasActiveClaimForCoverageAsync(Guid coverageId);
         Task<bool> HasSubmittedClaimForCoverageSinceAsync(Guid coverageId, DateTime submittedSinceUtc);
     }

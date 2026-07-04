@@ -80,6 +80,20 @@ namespace Motor.Claim.Infrastructure.Persistence.Repositories
                     .SetProperty(x => x.ValidationResult, claim.ValidationResult));
         }
 
+        public async Task UpdateOfficerDecisionAsync(ClaimEntity claim)
+        {
+            await _context.Claims
+                .Where(x => x.ClaimId == claim.ClaimId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, claim.Status)
+                    .SetProperty(x => x.ReviewStatus, claim.ReviewStatus)
+                    .SetProperty(x => x.OfficerDecisionNote, claim.OfficerDecisionNote)
+                    .SetProperty(x => x.DecidedAt, claim.DecidedAt)
+                    .SetProperty(x => x.ReviewedByUserId, claim.ReviewedByUserId)
+                    .SetProperty(x => x.RequestedItems, claim.RequestedItems)
+                    .SetProperty(x => x.RequestedAt, claim.RequestedAt));
+        }
+
         public async Task<bool> HasSubmittedClaimForCoverageSinceAsync(Guid coverageId, DateTime submittedSinceUtc)
         {
             return await _context.Claims.AnyAsync(x =>
